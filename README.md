@@ -85,12 +85,25 @@ A small CSV sample is provided in `data/sample_marketing.csv`.
 
 ## Evidence
 
-Screenshots and notebooks in this repo show:
-- KPI tables
-- ML predictions
-- Clustering outputs  
+This repository contains verifiable evidence of the system.
 
-This is a real, end-to-end data & AI pipeline.
+### Notebooks
+- `notebooks/01_marketing_kpi_revenue_prediction.ipynb`
+  - KPI computation (CTR, CVR, CPL, ROI)
+  - Revenue prediction model
+  - Campaign clustering (KMeans)
+
+### Screenshots (located in `/screenshots`)
+- `kpi_table.PNG` — KPI metrics layer (CTR, CVR, CPL, ROI)
+- `Graphique clusters.PNG` — Visual representation of campaign clusters
+- `Graphique et commentaires clusters.PNG` — Cluster interpretation and business comments
+- `Tableau des clusters.PNG` — Campaigns grouped by performance segments
+- `ai_marketing_decision_platform.png` — End-to-end view of the AI marketing decision platform
+
+These artifacts prove that this is a real, end-to-end
+analytics and AI pipeline, not just a conceptual design.
+
+
 
 
 Improve README with notebook, AI and usage details
