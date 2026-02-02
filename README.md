@@ -82,6 +82,7 @@ Import the notebook and run it on a cluster with access to `marketing_clean`.
 A small CSV sample is provided in `data/sample_marketing.csv`.
 
 ---
+The Streamlit app exposes campaign KPIs and ML predictions through a web UI, acting as a lightweight decision API for marketing teams.
 
 ## Evidence
 
