@@ -1,48 +1,49 @@
 import streamlit as st
+import requests
 import pandas as pd
+import time
 
-# Title
-st.title("Marketing AI Analytics Platform")
+def load_marketing_kpi():
+    host = st.secrets["DATABRICKS_HOST"]
+    token = st.secrets["DATABRICKS_TOKEN"]
+    warehouse_id = st.secrets["DATABRICKS_WAREHOUSE_ID"]
 
-# Description
-st.write("Dashboard for Marketing KPI and Campaign Analytics")
+    url = f"{host}/api/2.0/sql/statements"
 
-# Load data
-data = pd.read_csv("data/sample_marketing.csv")
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
 
-# Normalize column names
-data.columns = (
-    data.columns.astype(str)
-    .str.strip()
-    .str.lower()
-    .str.replace(" ", "_")
-)
+    payload = {
+        "statement": "SELECT * FROM marketing_kpi LIMIT 100",
+        "warehouse_id": warehouse_id
+    }
 
-# Debug: show columns
-st.subheader("Dataset columns (debug)")
-st.write(list(data.columns))
+    response = requests.post(url, headers=headers, json=payload)
+    result = response.json()
 
-# Check revenue exists
-if "revenue" not in data.columns:
-    st.error(f"Missing 'revenue' column. Available columns: {list(data.columns)}")
-    st.stop()
+    statement_id = result["statement_id"]
 
-# KPIs
-st.subheader("Key Metrics")
+    # attendre résultat
+    while True:
+        status_url = f"{host}/api/2.0/sql/statements/{statement_id}"
+        status_response = requests.get(status_url, headers=headers)
+        status_result = status_response.json()
 
-total_revenue = float(data["revenue"].sum())
+        if status_result["status"]["state"] == "SUCCEEDED":
+            break
 
-st.metric("Total Revenue", f"{total_revenue:,.2f}")
+        time.sleep(1)
 
-# Optional additional metrics if columns exist
-if "clicks" in data.columns:
-    total_clicks = int(data["clicks"].sum())
-    st.metric("Total Clicks", total_clicks)
+    data = status_result["result"]["data_array"]
+    columns = [col["name"] for col in status_result["result"]["schema"]["columns"]]
 
-if "impressions" in data.columns:
-    total_impressions = int(data["impressions"].sum())
-    st.metric("Total Impressions", total_impressions)
+    return pd.DataFrame(data, columns=columns)
 
-# Show data table
-st.subheader("Campaign Data")
-st.dataframe(data)
+
+df = load_marketing_kpi()
+
+st.title("Marketing AI Analytics Platform — LIVE Databricks")
+
+st.dataframe(df)
