@@ -1,14 +1,16 @@
 import streamlit as st
 import pandas as pd
 
+# Title
 st.title("Marketing AI Analytics Platform")
-st.write("Dashboard for Marketing KPI, Revenue Prediction, and Campaign Segmentation")
 
-# --- Load data ---
-path = "data/sample_marketing.csv"
-data = pd.read_csv(path)
+# Description
+st.write("Dashboard for Marketing KPI and Campaign Analytics")
 
-# Normalize column names (lowercase + remove spaces)
+# Load data
+data = pd.read_csv("data/sample_marketing.csv")
+
+# Normalize column names
 data.columns = (
     data.columns.astype(str)
     .str.strip()
@@ -16,47 +18,31 @@ data.columns = (
     .str.replace(" ", "_")
 )
 
+# Debug: show columns
 st.subheader("Dataset columns (debug)")
 st.write(list(data.columns))
 
-# Map possible column names -> standard names
-# Adjust this mapping if you know the exact names in your CSV
-rename_map = {}
-if "cost" not in data.columns:
-    for alt in ["spend", "ad_spend", "campaign_cost", "total_cost", "amount_spent"]:
-        if alt in data.columns:
-            rename_map[alt] = "cost"
-            break
-
+# Check revenue exists
 if "revenue" not in data.columns:
-    for alt in ["sales", "income", "turnover", "total_revenue"]:
-        if alt in data.columns:
-            rename_map[alt] = "revenue"
-            break
-
-if rename_map:
-    data = data.rename(columns=rename_map)
-
-# Check required columns
-required = ["cost", "revenue"]
-missing = [c for c in required if c not in data.columns]
-if missing:
-    st.error(
-        f"Missing required columns: {missing}. "
-        f"Available columns: {list(data.columns)}"
-    )
+    st.error(f"Missing 'revenue' column. Available columns: {list(data.columns)}")
     st.stop()
 
-# --- KPIs ---
+# KPIs
 st.subheader("Key Metrics")
-total_revenue = float(data["revenue"].sum())
-total_cost = float(data["cost"].sum())
 
-roi = (total_revenue - total_cost) / total_cost if total_cost != 0 else 0.0
+total_revenue = float(data["revenue"].sum())
 
 st.metric("Total Revenue", f"{total_revenue:,.2f}")
-st.metric("Total Cost", f"{total_cost:,.2f}")
-st.metric("ROI", f"{roi:.2f}")
 
+# Optional additional metrics if columns exist
+if "clicks" in data.columns:
+    total_clicks = int(data["clicks"].sum())
+    st.metric("Total Clicks", total_clicks)
+
+if "impressions" in data.columns:
+    total_impressions = int(data["impressions"].sum())
+    st.metric("Total Impressions", total_impressions)
+
+# Show data table
 st.subheader("Campaign Data")
 st.dataframe(data)
