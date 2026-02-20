@@ -548,7 +548,7 @@ with tab3:
         pred_sim = np.expm1(model.predict(sim)[0])
         st.success(f"📈 Revenue prédit : **{format_money(pred_sim)}**")
 
-        st.info("💡 Astuce portfolio : explique que ce modèle est une **démo** (meilleur avec +features: spend/leads/orders, et +données).")
+        st.info("💡Erreur élevée: utiliser les prédictions comme indication, pas comme valeur exacte.") **démo** (meilleur avec +features: spend/leads/orders, et +données).")
 
 # ============================================================
 # TAB 4 — Clustering
