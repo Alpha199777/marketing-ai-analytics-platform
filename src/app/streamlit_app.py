@@ -414,13 +414,83 @@ with tab2:
 # ============================================================
 with tab3:
     st.subheader("🔮 Prédire le revenue (RandomForest)")
-    st.markdown(
-        """
-Cette page entraîne un petit modèle **sur les données filtrées** pour prédire `revenue` à partir de signaux marketing.
-- On applique **log1p(revenue)** pour limiter l’effet des campagnes “très grosses” (distribution asymétrique).
-- On affiche **R²** (qualité globale) et **MAPE** (erreur relative) de façon stable.
-        """
-    )
+# ----------------------------
+# Explication des métriques ML
+# ----------------------------
+    with st.expander("ℹ️ Comprendre les métriques de prédiction (R², MAPE, log)"):
+        st.markdown("""
+    ### 🎯 Objectif
+    Ce modèle utilise le machine learning pour prédire le **revenue attendu d'une campagne marketing**.
+    
+    Il apprend la relation entre :
+    
+    • impressions  
+    • clicks  
+    • CTR  
+    • spend (si disponible)
+    
+    et le **revenue généré**.
+    
+    ---
+    
+    ### 📊 R² (coefficient de détermination)
+    
+    R² mesure la qualité globale du modèle.
+    
+    • R² = 1.0 → prédiction parfaite  
+    • R² = 0.5 → modèle correct  
+    • R² = 0 → modèle inutile  
+    • R² < 0 → modèle moins bon qu'une moyenne simple  
+    
+    👉 Dans le marketing réel :
+    
+    • 0.3 – 0.6 = bon modèle  
+    • 0.6 – 0.8 = très bon modèle  
+    • 0.8+ = excellent modèle  
+    
+    ---
+    
+    ### 📉 MAPE (%)
+    
+    MAPE = erreur moyenne en pourcentage.
+    
+    Exemple :
+    
+    MAPE = 20% → le modèle se trompe en moyenne de 20%
+    
+    Interprétation :
+    
+    • < 10% → excellent  
+    • 10–25% → bon  
+    • 25–50% → acceptable  
+    • > 50% → améliorable  
+    
+    ---
+    
+    ### 🔄 Pourquoi utiliser log(revenue)
+    
+    Le revenue marketing est souvent très asymétrique :
+    
+    • Beaucoup de petites campagnes  
+    • Quelques très grosses campagnes  
+    
+    Le log permet de :
+    
+    • stabiliser le modèle  
+    • éviter qu'une grosse campagne casse l'apprentissage  
+    • améliorer la précision globale  
+    
+    ---
+    
+    ### 💼 Business value
+    
+    Ce modèle permet de :
+    
+    • simuler une campagne avant lancement  
+    • estimer le revenue attendu  
+    • optimiser le budget marketing  
+    • aider à la prise de décision
+    """)
 
     features_candidates = ["impressions", "clicks", "ctr"]
     if "spend" in dff.columns:
