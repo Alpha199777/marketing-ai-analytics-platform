@@ -168,67 +168,111 @@ with tab1:
     # ----------------------------
     # Charts row
     # ----------------------------
-    left, right = st.columns([1.3, 1])
+# ----------------------------
+# Charts row
+# ----------------------------
+left, right = st.columns([1.3, 1])
 
- with left:
+# ----------------------------
+# LEFT : Time series
+# ----------------------------
+with left:
+
     st.subheader("📈 Tendance revenue dans le temps")
 
     ts = (
-        df.groupby(pd.Grouper(key="date", freq="D"))
+        dff.groupby(pd.Grouper(key="date", freq="D"))
         .agg(
             revenue=("revenue", "sum"),
             clicks=("clicks", "sum"),
-            impressions=("impressions", "sum")
+            impressions=("impressions", "sum"),
         )
         .reset_index()
     )
 
+    # nettoyer types
+    ts["date"] = pd.to_datetime(ts["date"], errors="coerce")
 
-import plotly.express as px
+    for c in ["revenue", "clicks", "impressions"]:
+        ts[c] = pd.to_numeric(ts[c], errors="coerce").fillna(0)
 
-fig = px.line(
-    ts,
-    x="date",
-    y="revenue",
-    title="Revenue dans le temps"
-)
+    ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan)
 
-st.plotly_chart(fig, use_container_width=True)
+    ts = ts.sort_values("date")
 
-# forcer types propres
-ts["date"] = pd.to_datetime(ts["date"], errors="coerce")
-for c in ["revenue", "clicks", "impressions"]:
-    ts[c] = pd.to_numeric(ts[c], errors="coerce").fillna(0)
+    metric = st.selectbox(
+        "Métrique",
+        ["revenue", "clicks", "impressions", "ctr"],
+        index=0,
+    )
 
-# CTR en pandas (évite np.where -> ndarray)
-ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
-
-# tri
-ts = ts.sort_values("date")
-
-metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
-
-if ts.empty:
-    st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
-else:
-    fig = px.line(ts, x="date", y=metric, markers=True)
-    fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
-    st.plotly_chart(fig, use_container_width=True) 
-    with right:
-        st.subheader("🏆 Top campagnes")
-        by_campaign = (
-            dff.groupby("campaign", as_index=False)
-            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
+    if ts.empty:
+        st.warning("Aucune donnée.")
+    else:
+        fig = px.line(
+            ts,
+            x="date",
+            y=metric,
+            markers=True,
         )
-        by_campaign["ctr"] = safe_div(by_campaign["clicks"], by_campaign["impressions"])
-        by_campaign["rev_per_click"] = safe_div(by_campaign["revenue"], by_campaign["clicks"])
 
-        sort_by = st.selectbox("Trier par", ["revenue", "clicks", "impressions", "ctr", "rev_per_click"], index=0)
-        top = by_campaign.sort_values(sort_by, ascending=False).head(top_n)
+        fig.update_layout(
+            height=360,
+            margin=dict(l=10, r=10, t=30, b=10),
+        )
 
-        fig2 = px.bar(top, x="campaign", y=sort_by)
-        fig2.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
+
+
+# ----------------------------
+# RIGHT : Top campaigns
+# ----------------------------
+with right:
+
+    st.subheader("🏆 Top campagnes")
+
+    by_campaign = (
+        dff.groupby("campaign", as_index=False)
+        .agg(
+            revenue=("revenue", "sum"),
+            clicks=("clicks", "sum"),
+            impressions=("impressions", "sum"),
+        )
+    )
+
+    by_campaign["ctr"] = safe_div(
+        by_campaign["clicks"],
+        by_campaign["impressions"],
+    )
+
+    by_campaign["rev_per_click"] = safe_div(
+        by_campaign["revenue"],
+        by_campaign["clicks"],
+    )
+
+    sort_by = st.selectbox(
+        "Trier par",
+        ["revenue", "clicks", "impressions", "ctr", "rev_per_click"],
+        index=0,
+    )
+
+    top = by_campaign.sort_values(
+        sort_by,
+        ascending=False,
+    ).head(top_n)
+
+    fig2 = px.bar(
+        top,
+        x="campaign",
+        y=sort_by,
+    )
+
+    fig2.update_layout(
+        height=360,
+        margin=dict(l=10, r=10, t=30, b=10),
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
 
     st.divider()
 
