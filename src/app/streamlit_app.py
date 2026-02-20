@@ -170,13 +170,30 @@ with tab1:
     # ----------------------------
     left, right = st.columns([1.3, 1])
 
-    with left:
-        st.subheader("📈 Tendance revenue dans le temps")
-       ts = (
-    dff.groupby(pd.Grouper(key="date", freq="D"))
-    .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
-    .reset_index()
+ with left:
+    st.subheader("📈 Tendance revenue dans le temps")
+
+    ts = (
+        df.groupby(pd.Grouper(key="date", freq="D"))
+        .agg(
+            revenue=("revenue", "sum"),
+            clicks=("clicks", "sum"),
+            impressions=("impressions", "sum")
+        )
+        .reset_index()
+    )
+
+
+import plotly.express as px
+
+fig = px.line(
+    ts,
+    x="date",
+    y="revenue",
+    title="Revenue dans le temps"
 )
+
+st.plotly_chart(fig, use_container_width=True)
 
 # forcer types propres
 ts["date"] = pd.to_datetime(ts["date"], errors="coerce")
