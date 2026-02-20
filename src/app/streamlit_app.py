@@ -192,6 +192,93 @@ with tab1:
     rpm_avg = np.nanmean(dff["rev_per_1k_impr"]) if len(dff) else np.nan
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
+    # ----------------------------
+# KPI explanations (portfolio friendly)
+# ----------------------------
+with st.expander("📖 Comprendre les indicateurs (KPI)"):
+    
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("""
+        ### 📊 CTR (Click-Through Rate)
+        
+        **Définition :**
+        
+        CTR = Clicks / Impressions
+        
+        **Ce que ça mesure :**
+        
+        → Le % de personnes qui cliquent après avoir vu la campagne.
+        
+        **Interprétation :**
+        
+        • CTR élevé → campagne attractive  
+        • CTR faible → message ou ciblage à améliorer  
+        
+        **Exemple :**
+        
+        1 000 impressions, 20 clicks → CTR = 2%
+        """)
+
+        st.markdown("""
+        ### 💶 € / Click (moyen)
+        
+        **Définition :**
+        
+        Revenue / Clicks
+        
+        **Ce que ça mesure :**
+        
+        → combien chaque click rapporte en moyenne.
+        
+        **Interprétation :**
+        
+        • élevé → traffic de qualité  
+        • faible → trafic peu qualifié
+        """)
+
+    with col2:
+        st.markdown("""
+        ### 👁️ € / 1k Impressions (RPM)
+        
+        **Définition :**
+        
+        Revenue / Impressions × 1000
+        
+        **Ce que ça mesure :**
+        
+        → revenu généré pour 1 000 vues.
+        
+        **Interprétation :**
+        
+        • élevé → campagne efficace  
+        • faible → mauvaise conversion
+        """)
+
+        st.markdown("""
+        ### 📈 Revenue total
+        
+        **Définition :**
+        
+        somme du revenu généré.
+        
+        **Utilisation business :**
+        
+        → identifier les campagnes les plus rentables.
+        """)
+
+        st.markdown("""
+        ### 🖱️ Clicks & 👁️ Impressions
+        
+        **Impressions :**
+        nombre de fois où la campagne est affichée
+        
+        **Clicks :**
+        nombre de clics générés
+        
+        Ensemble, ils mesurent la performance marketing.
+        """)
     k1.metric("Revenue total", format_money(total_revenue))
     k2.metric("Clicks", format_num(total_clicks))
     k3.metric("Impressions", format_num(total_impr))
