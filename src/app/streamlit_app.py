@@ -32,7 +32,15 @@ st.subheader("Key Metrics")
 
 total_revenue = float(data["revenue"].sum())
 
-st.metric("Total Revenue", f"{total_revenue:,.2f}")
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Revenue", f"{total_revenue:,.2f}")
+
+if "clicks" in data.columns:
+    col2.metric("Total Clicks", int(data["clicks"].sum()))
+
+if "impressions" in data.columns:
+    col3.metric("Total Impressions", int(data["impressions"].sum()))
 
 # Optional additional metrics if columns exist
 if "clicks" in data.columns:
