@@ -172,17 +172,31 @@ with tab1:
 
     with left:
         st.subheader("📈 Tendance revenue dans le temps")
-        ts = (
-            dff.groupby(pd.Grouper(key="date", freq="D"), as_index=False)
-            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
-        )
-        ts["ctr"] = safe_div(ts["clicks"], ts["impressions"])
+       ts = (
+    dff.groupby(pd.Grouper(key="date", freq="D"))
+    .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
+    .reset_index()
+)
 
-        metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
-        fig = px.line(ts, x="date", y=metric, markers=True)
-        fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+# forcer types propres
+ts["date"] = pd.to_datetime(ts["date"], errors="coerce")
+for c in ["revenue", "clicks", "impressions"]:
+    ts[c] = pd.to_numeric(ts[c], errors="coerce").fillna(0)
 
+# CTR en pandas (évite np.where -> ndarray)
+ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
+
+# tri
+ts = ts.sort_values("date")
+
+metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
+
+if ts.empty:
+    st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
+else:
+    fig = px.line(ts, x="date", y=metric, markers=True)
+    fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
+    st.plotly_chart(fig, use_container_width=True) 
     with right:
         st.subheader("🏆 Top campagnes")
         by_campaign = (
