@@ -183,6 +183,14 @@ tab1, tab2, tab3, tab4 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Predi
 # ============================================================
 # TAB 1 — DASHBOARD
 # ============================================================
+st.info("""
+Ce dashboard permet d'analyser la performance des campagnes marketing :
+
+• Identifier les campagnes les plus rentables  
+• Comprendre l’efficacité des impressions et des clics  
+• Optimiser l’allocation du budget marketing  
+• Supporter la prise de décision data-driven
+""")
 with tab1:
     total_revenue = dff["revenue"].sum()
     total_clicks = dff["clicks"].sum()
