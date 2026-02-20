@@ -425,64 +425,123 @@ with tab4:
         y_axis = st.selectbox("Axe Y", options=features, index=features.index("ctr") if "ctr" in features else 1)
         size_axis = st.selectbox("Taille des points", options=features, index=features.index("impressions") if "impressions" in features else 0)
 
-        # convertir cluster en texte (sinon plotly fait un dégradé)
-agg["cluster"] = agg["cluster"].astype(int).astype(str)
-
-# couleurs EXACTES comme ton image matplotlib
-CLUSTER_COLORS = {
-    "0": "#2ca02c",   # vert
-    "1": "#1f77b4",   # bleu
-    "2": "#ff7f0e",   # orange
-    "3": "#d62728",   # rouge
-}
-
-# noms lisibles
-CLUSTER_NAMES = {
-    "0": "Cluster 0 (Vert) – pépites rentables",
-    "1": "Cluster 1 (Bleu) – machines à cash",
-    "2": "Cluster 2 (Orange) – brûlent du budget",
-    "3": "Cluster 3 (Rouge) – cas isolé",
-}
-
-# label
-agg["cluster_label"] = agg["cluster"].map(CLUSTER_NAMES)
-
-# scatter PRO
-fig = px.scatter(
-    agg,
-    x="roi",
-    y="revenue",
-    color="cluster_label",
-    size="spend",   # taille logique business
-    hover_name="campaign",
-
-    color_discrete_map={
-        CLUSTER_NAMES[k]: v for k, v in CLUSTER_COLORS.items()
-    },
-
-    opacity=0.9,
-)
-
-# bordure blanche (lisibilité sur fond noir)
-fig.update_traces(
-    marker=dict(
-        line=dict(width=1.5, color="white")
-    )
-)
-
-# layout propre
-fig.update_layout(
-    height=600,
-    legend_title="Clusters",
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
+    # ============================
+    # Graphique clustering PRO
+    # ============================
+        
+        fig = px.scatter(
+            agg,
+            x="roi",
+            y="revenue",
+        
+            color="cluster",
+            size="revenue",
+        
+            hover_name="campaign",
+        
+            color_discrete_map={
+                0: "#2ecc71",  # vert
+                1: "#3498db",  # bleu
+                2: "#f39c12",  # orange
+                3: "#e74c3c",  # rouge
+                4: "#9b59b6",  # violet
+                5: "#1abc9c"   # turquoise
+            },
+        
+            size_max=40
+        )
+        
+        fig.update_layout(
+            height=600,
+            title="Segmentation des campagnes (ROI vs Revenue)",
+            legend_title="Cluster",
+            margin=dict(l=10, r=10, t=40, b=10)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        
+  # ============================
+  # Résumé clusters
+  # ============================
+        
+        st.markdown("### 📊 Résumé clusters")
+        
+        summary = (
+            agg.groupby("cluster")
+            .agg({
+                "revenue": "mean",
+                "roi": "mean",
+                "clicks": "mean",
+                "impressions": "mean",
+                "campaign": "count"
+            })
+            .rename(columns={"campaign": "nb_campaigns"})
+            .reset_index()
+        )
+        
+        st.dataframe(summary, use_container_width=True)
+        
+        
+   # ============================
+        # Commentaire automatique PORTFOLIO
+        # ============================
+        
         st.markdown("### 🧠 Commentaire (portfolio)")
-        if k == 4:
-            st.write("🔵 **Cluster 1** : machines à cash — gros CA, ROI positif → à scaler.")
-            st.write("🟢 **Cluster 0** : petites campagnes rentables — pépites à développer.")
-            st.write("🟠 **Cluster 2** : brûle du budget — ROI négatif → à couper / repenser.")
-            st.write("🔴 **Cluster 3** : cas isolé / atypique — à analyser manuellement.")
-        else:
-            st.write("👉 Interprète chaque cluster via ses moyennes (revenue/ctr/roas/roi) et donne une action business.")
+        
+        for _, row in summary.iterrows():
+        
+            cluster = row["cluster"]
+            roi = row["roi"]
+            revenue = row["revenue"]
+        
+            if roi > 1:
+                st.success(
+                    f"🔵 Cluster {cluster} : campagnes très rentables "
+                    f"(ROI {roi:.2f}) → scaler en priorité."
+                )
+        
+            elif roi > 0:
+                st.info(
+                    f"🟢 Cluster {cluster} : campagnes rentables "
+                    f"(ROI {roi:.2f}) → optimiser et développer."
+                )
+        
+            elif roi > -0.5:
+                st.warning(
+                    f"🟠 Cluster {cluster} : campagnes peu performantes "
+                    f"(ROI {roi:.2f}) → optimisation recommandée."
+                )
+        
+            else:
+                st.error(
+                    f"🔴 Cluster {cluster} : campagnes non rentables "
+                    f"(ROI {roi:.2f}) → à revoir ou arrêter."
+                )
+        
+        
+        # ============================
+        # Commentaire global portfolio
+        # ============================
+        
+        best_cluster = summary.sort_values("roi", ascending=False).iloc[0]
+        worst_cluster = summary.sort_values("roi").iloc[0]
+        
+        st.markdown("---")
+        
+        st.markdown("### 🎯 Analyse stratégique")
+        
+        st.write(
+            f"Le cluster le plus performant est le Cluster {best_cluster['cluster']} "
+            f"avec ROI moyen de {best_cluster['roi']:.2f}."
+        )
+        
+        st.write(
+            f"Le cluster le moins performant est le Cluster {worst_cluster['cluster']} "
+            f"avec ROI moyen de {worst_cluster['roi']:.2f}."
+        )
+        
+        st.write(
+            "Recommandation : réallouer le budget vers les clusters les plus performants "
+            "et optimiser ou arrêter les campagnes non rentables."
+        )  
