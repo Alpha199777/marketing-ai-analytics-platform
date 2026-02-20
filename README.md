@@ -173,11 +173,24 @@ Key steps:
 
 A Streamlit web application exposes:
 
-* Campaign KPI metrics
-* Revenue predictions
-* Campaign segmentation
+## Live Application Demo
 
-This acts as a lightweight AI-ready decision interface.
+Public Streamlit application:
+
+https://marketing-ai-platform-alpha.streamlit.app
+
+Features available in the live demo:
+
+- KPI dashboard (Revenue, CTR, ROAS, ROI)
+- Campaign performance analysis
+- Machine learning revenue prediction (RandomForest)
+- Campaign clustering (KMeans segmentation)
+- Scenario simulation for decision support
+- Interactive filters and visualizations
+
+This demonstrates a production-ready AI analytics platform architecture.
+
+No local setup required — fully accessible online.
 
 ---
 
