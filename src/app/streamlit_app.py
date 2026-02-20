@@ -425,17 +425,58 @@ with tab4:
         y_axis = st.selectbox("Axe Y", options=features, index=features.index("ctr") if "ctr" in features else 1)
         size_axis = st.selectbox("Taille des points", options=features, index=features.index("impressions") if "impressions" in features else 0)
 
-        fig = px.scatter(
-            agg,
-            x=x_axis,
-            y=y_axis,
-            color="cluster",
-            size=size_axis,
-            hover_name="campaign",
-            size_max=40
-        )
-        fig.update_layout(height=520, margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        # convertir cluster en texte (sinon plotly fait un dégradé)
+agg["cluster"] = agg["cluster"].astype(int).astype(str)
+
+# couleurs EXACTES comme ton image matplotlib
+CLUSTER_COLORS = {
+    "0": "#2ca02c",   # vert
+    "1": "#1f77b4",   # bleu
+    "2": "#ff7f0e",   # orange
+    "3": "#d62728",   # rouge
+}
+
+# noms lisibles
+CLUSTER_NAMES = {
+    "0": "Cluster 0 (Vert) – pépites rentables",
+    "1": "Cluster 1 (Bleu) – machines à cash",
+    "2": "Cluster 2 (Orange) – brûlent du budget",
+    "3": "Cluster 3 (Rouge) – cas isolé",
+}
+
+# label
+agg["cluster_label"] = agg["cluster"].map(CLUSTER_NAMES)
+
+# scatter PRO
+fig = px.scatter(
+    agg,
+    x="roi",
+    y="revenue",
+    color="cluster_label",
+    size="spend",   # taille logique business
+    hover_name="campaign",
+
+    color_discrete_map={
+        CLUSTER_NAMES[k]: v for k, v in CLUSTER_COLORS.items()
+    },
+
+    opacity=0.9,
+)
+
+# bordure blanche (lisibilité sur fond noir)
+fig.update_traces(
+    marker=dict(
+        line=dict(width=1.5, color="white")
+    )
+)
+
+# layout propre
+fig.update_layout(
+    height=600,
+    legend_title="Clusters",
+)
+
+st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("### 🧠 Commentaire (portfolio)")
         if k == 4:
