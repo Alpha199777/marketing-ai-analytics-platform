@@ -11,6 +11,10 @@ The platform builds a structured KPI and machine learning layer that can be cons
 * LLM-based assistants and AI agents
 * Web applications and APIs
 
+Public Streamlit application:
+
+https://marketing-ai-platform-alpha.streamlit.app
+
 It serves as a foundation for enterprise AI systems operating on structured business data.
 
 ---
