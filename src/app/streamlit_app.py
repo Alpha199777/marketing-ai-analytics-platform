@@ -782,7 +782,73 @@ with tab5:
             )
             return {"rows": rows, "summary": f"Agrégation par {group_by}."}
 
-        _TOOL_MAP = {t.name: t for t in [_underperforming, _rank, _agg]}
+        # ── Simulate Budget Tool ──
+        class _SB(_BM):
+            budget_increase_pct: float = _F(default=20.0, description="Pourcentage d'augmentation du budget (ex: 20 = +20%).")
+            category: str = _F(default="all", description="Catégorie à simuler (ex: social, search, influencer, all).")
+
+        @_tool("simulate_budget", args_schema=_SB)
+        def _simulate(budget_increase_pct=20.0, category="all"):
+            """Simule l'impact d'une augmentation de budget sur le revenue via RandomForest."""
+            import numpy as _np
+            from sklearn.ensemble import RandomForestRegressor as _RF
+
+            # Récupère les données d'entraînement
+            where = f"WHERE category = '{category}'" if category != "all" else ""
+            rows = _run_sql(f"""
+                SELECT mark_spent, clicks, impressions, ctr, cvr, leads, orders, revenue
+                FROM marketing_kpi {where}
+                ORDER BY revenue DESC LIMIT 500
+            """)
+            if len(rows) < 10:
+                return {"summary": "Pas assez de données pour simuler.", "rows": []}
+
+            df_cols = list(rows[0].keys())
+            import pandas as _pd
+            df = _pd.DataFrame(rows, columns=df_cols)
+            for c in df_cols:
+                df[c] = _pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+            features = ["mark_spent", "clicks", "impressions", "ctr", "cvr"]
+            features = [f for f in features if f in df.columns]
+            X = df[features].values
+            y = _np.log1p(df["revenue"].values)
+
+            model = _RF(n_estimators=100, random_state=42)
+            model.fit(X, y)
+
+            # Scénario actuel
+            X_base = df[features].copy()
+            rev_base = _np.expm1(model.predict(X_base.values)).sum()
+
+            # Scénario +budget
+            X_sim = X_base.copy()
+            if "mark_spent" in features:
+                X_sim["mark_spent"] = X_sim["mark_spent"] * (1 + budget_increase_pct / 100)
+            if "clicks" in features:
+                X_sim["clicks"] = X_sim["clicks"] * (1 + budget_increase_pct / 100 * 0.7)
+            rev_sim = _np.expm1(model.predict(X_sim.values)).sum()
+
+            delta = rev_sim - rev_base
+            delta_pct = (delta / rev_base * 100) if rev_base > 0 else 0
+            roi_sim = delta / (df["mark_spent"].sum() * budget_increase_pct / 100) if df["mark_spent"].sum() > 0 else 0
+
+            result_rows = [{
+                "categorie": category,
+                "budget_actuel": round(df["mark_spent"].sum(), 2),
+                "budget_simule": round(df["mark_spent"].sum() * (1 + budget_increase_pct/100), 2),
+                "revenue_actuel": round(rev_base, 2),
+                "revenue_simule": round(rev_sim, 2),
+                "delta_revenue": round(delta, 2),
+                "delta_pct": round(delta_pct, 2),
+                "roi_incremental": round(roi_sim, 4),
+            }]
+            summary = (f"Simulation +{budget_increase_pct}% budget ({category}) : "
+                      f"revenue {rev_base:,.0f} → {rev_sim:,.0f} "
+                      f"(+{delta_pct:.1f}%, ROI incrémental : {roi_sim:.2f})")
+            return {"rows": result_rows, "summary": summary}
+
+        _TOOL_MAP = {t.name: t for t in [_underperforming, _rank, _agg, _simulate]}
 
         class _State(_BM):
             user_question: str
@@ -795,7 +861,7 @@ with tab5:
 
         def _route(state):
             msg = _llm.invoke([
-                _SM(content="Routeur marketing. Choisis : kpi_qa, diagnostic, ou segmentation. Un seul mot."),
+                _SM(content="Routeur marketing. Choisis : kpi_qa, diagnostic, segmentation, ou budget_simulation. Un seul mot. Choisis budget_simulation si la question parle de simulation, budget, augmentation, impact budget."),
                 _HM(content=state.user_question)
             ])
             state.intent = msg.content.strip() if msg.content.strip() in {"kpi_qa", "diagnostic", "segmentation"} else "kpi_qa"
