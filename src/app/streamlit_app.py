@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -178,7 +179,7 @@ dff = df.loc[mask].copy()
 # ----------------------------
 # Tabs
 # ----------------------------
-tab1, tab2, tab3, tab4 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering", "🤖 Agent AI"])
 
 # ============================================================
 # TAB 1 — DASHBOARD
@@ -710,3 +711,203 @@ with tab4:
             "Recommandation : réallouer le budget vers les clusters les plus performants "
             "et optimiser ou arrêter les campagnes non rentables."
         )  
+
+
+# ============================================================
+# TAB 5 — AGENT AI
+# ============================================================
+with tab5:
+    st.subheader("🤖 Agent Autonome Marketing")
+    st.caption("Pose une question en langage naturel — l'agent interroge ta base Databricks et répond.")
+
+    missing_vars = [v for v in ["DATABRICKS_SERVER_HOSTNAME", "DATABRICKS_HTTP_PATH", "DATABRICKS_ACCESS_TOKEN", "OPENAI_API_KEY"] if not os.environ.get(v)]
+
+    if missing_vars:
+        st.error(f"Variables manquantes : {', '.join(missing_vars)}")
+        st.code('\n'.join([
+            '$env:DATABRICKS_SERVER_HOSTNAME = "dbc-xxx.cloud.databricks.com"',
+            '$env:DATABRICKS_HTTP_PATH = "/sql/1.0/warehouses/xxx"',
+            '$env:DATABRICKS_ACCESS_TOKEN = "dapiXXX"',
+            '$env:OPENAI_API_KEY = "sk-XXX"',
+        ]))
+    else:
+        import json as _json
+        from databricks import sql as _dbsql
+        from langchain_openai import ChatOpenAI as _ChatOpenAI
+        from langchain_core.messages import SystemMessage as _SM, HumanMessage as _HM
+        from langchain_core.tools import tool as _tool
+        from pydantic import BaseModel as _BM, Field as _F
+        from langgraph.graph import StateGraph as _SG, END as _END
+        from typing import Literal as _Lit, Optional as _Opt
+
+        def _run_sql(query, params=(), max_rows=100):
+            with _dbsql.connect(
+                server_hostname=os.environ["DATABRICKS_SERVER_HOSTNAME"],
+                http_path=os.environ["DATABRICKS_HTTP_PATH"],
+                access_token=os.environ["DATABRICKS_ACCESS_TOKEN"],
+            ) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(query, params)
+                    cols = [c[0] for c in cur.description] if cur.description else []
+                    return [dict(zip(cols, r)) for r in cur.fetchmany(max_rows)]
+
+        def _fmt(rows, n=8):
+            if not rows:
+                return "Aucun résultat."
+            keys = list(rows[0].keys())
+            lines = [" | ".join(keys), "-" * 80]
+            for r in rows[:n]:
+                lines.append(" | ".join(str(r.get(k, "")) for k in keys))
+            if len(rows) > n:
+                lines.append(f"... ({len(rows)-n} lignes supplémentaires)")
+            return "\n".join(lines)
+
+        class _UP(_BM):
+            roi_threshold: float = _F(default=0.0)
+            limit: int = _F(default=10)
+
+        @_tool("get_underperforming_campaigns", args_schema=_UP)
+        def _underperforming(roi_threshold=0.0, limit=10):
+            """Campagnes avec ROI sous le seuil."""
+            rows = _run_sql(
+                "SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi WHERE roi < ? ORDER BY roi ASC LIMIT ?",
+                (roi_threshold, limit)
+            )
+            return {"rows": rows, "summary": f"{len(rows)} campagnes sous-performantes (ROI < {roi_threshold})."}
+
+        class _RP(_BM):
+            metric: _Lit["roi", "revenue", "ctr", "cvr"] = _F(default="roi")
+            direction: _Lit["top", "bottom"] = _F(default="top")
+            limit: int = _F(default=10)
+
+        @_tool("rank_campaigns", args_schema=_RP)
+        def _rank(metric="roi", direction="top", limit=10):
+            """Classe les campagnes par métrique."""
+            order = "DESC" if direction == "top" else "ASC"
+            rows = _run_sql(
+                f"SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi ORDER BY {metric} {order} LIMIT ?",
+                (limit,)
+            )
+            return {"rows": rows, "summary": f"{direction} {limit} par {metric}."}
+
+        class _AP(_BM):
+            group_by: _Lit["category"] = _F(default="category")
+
+        @_tool("aggregate_by_dimension", args_schema=_AP)
+        def _agg(group_by="category"):
+            """Agrège les KPI par catégorie."""
+            rows = _run_sql(
+                f"SELECT {group_by}, COUNT(*) as n, ROUND(AVG(roi),4) as avg_roi, ROUND(SUM(revenue),2) as total_revenue FROM marketing_kpi GROUP BY {group_by} ORDER BY total_revenue DESC"
+            )
+            return {"rows": rows, "summary": f"Agrégation par {group_by}."}
+
+        _TOOL_MAP = {t.name: t for t in [_underperforming, _rank, _agg]}
+
+        class _State(_BM):
+            user_question: str
+            intent: _Opt[str] = None
+            tool_calls: list = []
+            tool_results: list = []
+            final_answer: _Opt[str] = None
+
+        _llm = _ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+
+        def _route(state):
+            msg = _llm.invoke([
+                _SM(content="Routeur marketing. Choisis : kpi_qa, diagnostic, ou segmentation. Un seul mot."),
+                _HM(content=state.user_question)
+            ])
+            state.intent = msg.content.strip() if msg.content.strip() in {"kpi_qa", "diagnostic", "segmentation"} else "kpi_qa"
+            return state
+
+        def _plan(state):
+            system_prompt = (
+                "Planner marketing. Tools disponibles:\n"
+                "- get_underperforming_campaigns(roi_threshold, limit)\n"
+                "- rank_campaigns(metric, direction, limit)\n"
+                "- aggregate_by_dimension(group_by)\n"
+                'Retourne UNIQUEMENT un JSON valide, ex: [{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":5}}]'
+            )
+            msg = _llm.invoke([
+                _SM(content=system_prompt),
+                _HM(content=f"Question: {state.user_question}\nIntention: {state.intent}")
+            ])
+            try:
+                content = msg.content.strip().replace("```json", "").replace("```", "")
+                calls = _json.loads(content)
+                state.tool_calls = calls[:2] if isinstance(calls, list) else []
+            except Exception:
+                state.tool_calls = []
+            return state
+
+        def _execute(state):
+            results = []
+            for call in state.tool_calls:
+                name = call.get("tool")
+                if name in _TOOL_MAP:
+                    out = _TOOL_MAP[name].invoke(call.get("args", {}))
+                    results.append({"tool": name, "output": out})
+            state.tool_results = results
+            return state
+
+        def _compose(state):
+            ctx_parts = []
+            for r in state.tool_results:
+                out = r["output"]
+                ctx_parts.append(f"TOOL: {r['tool']}\nSUMMARY: {out.get('summary','')}\nDATA:\n{_fmt(out.get('rows', []))}")
+            ctx = "\n\n".join(ctx_parts) if ctx_parts else "Aucun résultat."
+            msg = _llm.invoke([
+                _SM(content="Assistant marketing analytique. Réponds en français, orienté business. Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."),
+                _HM(content=f"Question: {state.user_question}\n\nDonnées:\n{ctx}")
+            ])
+            state.final_answer = msg.content
+            return state
+
+        @st.cache_resource
+        def _build_graph():
+            g = _SG(_State)
+            g.add_node("route", _route)
+            g.add_node("plan", _plan)
+            g.add_node("execute", _execute)
+            g.add_node("compose", _compose)
+            g.set_entry_point("route")
+            g.add_edge("route", "plan")
+            g.add_edge("plan", "execute")
+            g.add_edge("execute", "compose")
+            g.add_edge("compose", _END)
+            return g.compile()
+
+        AGENT_GRAPH = _build_graph()
+
+        # Exemples de questions
+        st.markdown("**💡 Exemples de questions :**")
+        ex_cols = st.columns(3)
+        examples = [
+            "Top 5 campagnes par ROI",
+            "Campagnes sous-performantes (ROI < 0)",
+            "Analyse par catégorie",
+        ]
+        for i, ex in enumerate(examples):
+            with ex_cols[i]:
+                if st.button(ex, key=f"agent_ex_{i}"):
+                    st.session_state["agent_q"] = ex
+
+        st.divider()
+
+        question = st.text_input(
+            "Pose ta question :",
+            value=st.session_state.get("agent_q", ""),
+            placeholder="Ex: Quelles campagnes ont le meilleur ROI ?",
+        )
+
+        if st.button("🚀 Analyser", type="primary") and question.strip():
+            with st.spinner("🤖 L'agent analyse tes données Databricks..."):
+                try:
+                    state = _State(user_question=question)
+                    result = AGENT_GRAPH.invoke(state)
+                    st.markdown("### 📊 Réponse de l'agent")
+                    st.markdown(result["final_answer"])
+                    with st.expander("🔍 Détails techniques (tool calls)"):
+                        st.json(result["tool_calls"])
+                except Exception as e:
+                    st.error(f"Erreur agent : {e}")
