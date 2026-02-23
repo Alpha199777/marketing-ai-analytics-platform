@@ -4,285 +4,416 @@
 
 This project demonstrates how to transform raw marketing campaign data into a production-ready analytics and AI decision platform using Databricks, Delta Lake, and PySpark MLlib.
 
-Databricks + Delta Lake
+The platform builds a structured KPI and machine learning layer that can be consumed by:
 
-PySpark ML
+* BI tools (Power BI, dashboards)
+* Retrieval-Augmented Generation (RAG) systems
+* LLM-based assistants and AI agents
+* Web applications and APIs
 
-Databricks SQL Warehouse
+Public Streamlit application:
 
-LangGraph (AI agent orchestration)
-
-Streamlit (interactive web application)
-
-The platform combines:
-
-Structured KPI engineering
-
-Machine learning (prediction + segmentation)
-
-A fully deployed Autonomous Marketing AI Agent
-
-Executive-ready dashboard visualization
-
-🔗 Live Application:
 https://marketing-ai-platform-alpha.streamlit.app
 
-🎯 Business Objective
+It serves as a foundation for enterprise AI systems operating on structured business data.
+
+---
+
+## Business Use Case
 
 Marketing teams need to:
 
-Identify top-performing campaigns (ROI, revenue, CTR)
+* Identify which campaigns generate the highest ROI
+* Predict expected revenue for future campaigns
+* Detect underperforming campaigns early
+* Segment campaigns into performance groups
+* Enable AI assistants to answer business questions
 
-Detect underperforming campaigns early
+Example AI-powered questions supported:
 
-Segment campaigns by performance level
+* "Which campaigns are underperforming?"
+* "Which segment has the highest ROI?"
+* "What revenue can we expect if budget increases by 20%?"
+* "Simulate +20% budget on social campaigns"
+* "Top 5 campaigns by ROI"
+* "Analyse performance by category"
 
-Simulate budget increases before investing
+---
 
-Ask business questions in natural language
+## System Architecture
 
-Example supported questions:
-
-“Which campaigns are underperforming?”
-
-“What are the 5 campaigns with the highest ROI?”
-
-“Aggregate revenue by channel.”
-
-“Simulate +20% budget on social campaigns.”
-
-🏗 System Architecture
-Raw Marketing Data (CSV / Database)
+```
+Raw marketing data (CSV / Database)
         ↓
-Curated Table (marketing_clean) – Delta Lake
+Curated table (marketing_clean) – Delta Lake
         ↓
-KPI Computation Layer (PySpark)
+KPI computation layer (PySpark)
         ↓
 marketing_kpi (Delta Table / Lakehouse)
         ↓
 Machine Learning Layer
-    - Revenue Prediction (RandomForest)
-    - Campaign Segmentation (KMeans)
+    - Revenue prediction (RandomForestRegressor)
+    - Campaign segmentation (KMeans clustering)
+    - Budget simulation (RandomForest — real-time training)
         ↓
-AI & Consumption Layer
-    - Streamlit Dashboard
-    - Marketing AI Agent (LangGraph)
-    - Databricks SQL Warehouse
-    - BI tools (Power BI / Fabric)
-📊 Data & KPI Layer
-Input Table: marketing_clean
+Autonomous Agent Layer (LangGraph + GPT-4o-mini)
+    - Natural language query interface
+    - Parameterized SQL tools
+    - Business recommendations
+        ↓
+Consumption Layer
+    - BI dashboards (Power BI / Fabric)
+    - LLM assistants (RAG on structured data)
+    - Streamlit web app (5 tabs)
+    - APIs and AI agents
+```
 
-Contains:
+---
 
-campaign_id
+## Data Layer
 
-impressions
+### Input Table: marketing_clean
 
-clicks
+Contains raw campaign data including:
 
-leads / orders
+* campaign_id
+* impressions
+* clicks
+* conversions
+* cost
+* revenue
+* channel / segment
 
-mark_spent
+### KPI Table: marketing_kpi (Delta Table)
 
-revenue
+Computed metrics include:
 
-category / channel
+* CTR (Click Through Rate)
+* CVR (Conversion Rate)
+* CPL (Cost Per Lead)
+* ROI (Return on Investment)
+* ROAS (Return on Ad Spend)
+* mark_spent (budget allocated per campaign)
 
-KPI Table: marketing_kpi
+This table acts as the structured knowledge base for analytics and AI.
 
-Computed metrics:
+---
 
-CTR (%)
+## Machine Learning Layer
 
-CVR (%)
+### Revenue Prediction
 
-CPL
+Model: RandomForestRegressor (PySpark MLlib / scikit-learn)
 
-ROI (%)
+Purpose:
 
-Revenue (CHF)
+* Predict expected revenue for future campaigns
+* Enable scenario simulation for decision-making
 
-Spend (CHF)
+Example:
 
-This Delta table acts as the structured knowledge base for both analytics and AI.
+"What happens if budget increases?"
 
-🤖 Marketing Autonomous Agent
+The model estimates revenue impact.
 
-A production-ready AI agent built with LangGraph and connected directly to Databricks SQL Warehouse.
+---
 
-The agent:
+### Budget Simulation (simulate_budget tool)
 
-Understands natural language business questions
+Model: RandomForestRegressor — retrained in real-time on Databricks data
 
-Selects the correct SQL or ML tool
+Purpose:
 
-Queries real campaign data
+* Simulate the impact of a budget increase (%) on expected revenue
+* Available per category (social, search, influencer, media, all)
 
-Generates grounded recommendations
+Output:
 
-Formats outputs using business-ready standards (CHF, %, integer spacing)
+```
+Simulation +20% budget (social):
+  Budget actuel   : CHF 48 231
+  Budget simulé   : CHF 57 877
+  Revenue actuel  : CHF 423 890
+  Revenue simulé  : CHF 461 204
+  Delta revenue   : +CHF 37 314 (+8.8%)
+  ROI incrémental : 77.4%
+```
 
-🔧 Agent Tools
+---
 
-rank_campaigns
+### Campaign Segmentation
 
-aggregate_by_dimension
+Model: KMeans clustering
 
-get_underperforming_campaigns
+Purpose:
 
-segment_campaigns
+* Identify high-performing and low-performing campaign groups
+* Enable strategic budget allocation
 
-simulate_budget (RandomForest-based simulation)
+Output:
 
-📈 Budget Simulation
+Campaigns grouped into performance clusters with interpretable business meaning and color-coded commentary.
 
-The simulate_budget tool:
+---
 
-Retrieves historical campaign data
+## Autonomous Agent — LangGraph
 
-Trains a RandomForest model in real time
+The platform includes a fully autonomous marketing agent built with **LangGraph** and **GPT-4o-mini**.
 
-Simulates revenue impact of a budget increase
+### Workflow
 
-Returns:
+```
+User question (natural language)
+        ↓
+route_intent     → kpi_qa | diagnostic | segmentation | budget_simulation
+        ↓
+plan_tools       → LLM selects 1-2 tools and generates JSON call
+        ↓
+execute_tools    → Parameterized SQL queries on Databricks SQL Warehouse
+        ↓
+compose_answer   → Business response in French with 2-4 recommendations
+```
 
-Current spend (CHF)
+### Available Tools
 
-Simulated spend (CHF)
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `rank_campaigns` | Top/Bottom campaigns by metric | `metric`, `direction`, `limit` |
+| `get_underperforming_campaigns` | Campaigns below ROI threshold | `roi_threshold`, `limit` |
+| `aggregate_by_dimension` | KPI aggregation by category | `group_by` |
+| `simulate_budget` | RandomForest budget simulation | `budget_increase_pct`, `category` |
 
-Current revenue (CHF)
+### Security
 
-Predicted revenue (CHF)
+* Parameterized SQL queries (SQL injection prevention)
+* Whitelisted table: `marketing_kpi` only
+* Forbidden operations: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`
+* Whitelisted metrics: `roi`, `revenue`, `ctr`, `cvr`
 
-Incremental ROI (%)
+---
 
-🎨 Streamlit Application
+## RAG (Retrieval-Augmented Generation) Integration
 
-The Streamlit app includes:
+The table `marketing_kpi` serves as a structured knowledge base for AI assistants.
 
-Dashboard
+Retrieval layer:
 
-KPI summary cards
+* SQL queries retrieve relevant campaign records
+* Filtering based on ROI, CVR, CPL, revenue
 
-Performance analysis
+Generation layer:
 
-ROI vs Revenue clustering
+* Retrieved KPI rows are injected into LLM prompts
+* LLM generates grounded explanations and recommendations
 
-Clean CHF formatting
+Example workflow:
 
-ROI / CTR displayed as percentages (1 decimal)
+```
+User question
+   ↓
+SQL retrieval from marketing_kpi
+   ↓
+Relevant campaign KPI rows
+   ↓
+Injected into LLM prompt
+   ↓
+LLM generates grounded business explanation
+```
 
-Integers formatted with spaces (2 999 919)
+This enables enterprise-safe AI grounded in real business data.
 
-🤖 Agent AI Tab
+---
 
-Natural language chat interface
+## Streamlit Application — 5 Tabs
 
-Example business prompts
+| Tab | Description |
+|-----|-------------|
+| 📌 **Dashboard** | Global KPIs, time series, top campaigns, KPI glossary |
+| 💰 **ROI/ROAS** | Return on investment analysis by campaign |
+| 🔮 **Prediction** | RandomForest revenue prediction with scenario simulation |
+| 🧩 **Clustering** | KMeans campaign segmentation with color-coded commentary |
+| 🧠 **Agent AI** | Autonomous LangGraph agent — natural language queries on Databricks |
 
-Real-time SQL grounding
+### Live Application Demo
 
-Budget simulation tool
+Public Streamlit application:
 
-🔐 Production Deployment (Streamlit Cloud)
+https://marketing-ai-platform-alpha.streamlit.app
 
-The AI agent runs in production using Streamlit Cloud.
+Features available in the live demo:
 
-Required Secrets
-DATABRICKS_SERVER_HOSTNAME = "..."
-DATABRICKS_HTTP_PATH = "..."
-DATABRICKS_ACCESS_TOKEN = "dapi..."
-OPENAI_API_KEY = "sk-..."
-Required Dependencies (requirements.txt)
+- KPI dashboard (Revenue, CTR, ROAS, ROI) in CHF
+- Campaign performance analysis with filters
+- Machine learning revenue prediction (RandomForest)
+- Campaign clustering (KMeans segmentation)
+- Budget simulation (+X% impact on revenue)
+- Autonomous AI agent with 4 tools
+- Interactive filters and visualizations
 
-streamlit
+This demonstrates a production-ready AI analytics platform architecture.
 
-pandas
+No local setup required — fully accessible online.
 
-numpy
+---
 
-plotly
+## Notebook
 
-scikit-learn
+Core implementation:
 
-databricks-sql-connector
+```
+notebooks/01_marketing_kpi_revenue_prediction.ipynb
+```
 
-langchain
+Key steps:
 
-langchain-openai
+* Load marketing_clean dataset
+* Compute KPI metrics (CTR, CVR, CPL, ROI)
+* Train revenue prediction model
+* Predict revenue for new campaigns
+* Perform campaign clustering
+* Save structured Delta table for downstream consumption
 
-langgraph
+---
 
-pydantic
+## How to Run
 
-After pushing to GitHub, Streamlit Cloud redeploys automatically.
+### Option 1 — Databricks (Recommended)
 
-⚠️ Common Issues & Fixes
-No module named 'databricks'
-python -m pip install databricks-sql-connector
-Environment variable KeyError
+1. Import notebook into Databricks workspace
+2. Connect to Delta Lake / Fabric Lakehouse
+3. Run notebook on a cluster
 
-Ensure variables are defined in the active terminal session.
+Output:
 
-Invalid credential error
+* marketing_kpi Delta table
+* ML models
+* KPI metrics layer
 
-Generate a new Databricks token (tokens start with dapi...).
+---
 
-Streamlit FileNotFoundError
+### Option 2 — Local Demo
 
-Run from project root:
+Configure environment variables (PowerShell):
 
+```powershell
+$env:DATABRICKS_SERVER_HOSTNAME = "dbc-xxx.cloud.databricks.com"
+$env:DATABRICKS_HTTP_PATH       = "/sql/1.0/warehouses/xxx"
+$env:DATABRICKS_ACCESS_TOKEN    = "dapiXXX"
+$env:OPENAI_API_KEY             = "sk-XXX"
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Launch application:
+
+```bash
 python -m streamlit run src/app/streamlit_app.py
-🧠 Applied AI Capabilities Demonstrated
+```
 
-KPI engineering for structured AI grounding
+---
 
-SQL-based RAG on enterprise data
+### Option 3 — Streamlit Cloud Deployment
 
-LangGraph agent orchestration
+Add secrets in Streamlit Cloud (Settings → Secrets):
 
-ML-based decision simulation
+```toml
+DATABRICKS_SERVER_HOSTNAME = "dbc-xxx.cloud.databricks.com"
+DATABRICKS_HTTP_PATH       = "/sql/1.0/warehouses/xxx"
+DATABRICKS_ACCESS_TOKEN    = "dapiXXX"
+OPENAI_API_KEY             = "sk-XXX"
+```
 
-Production deployment with secrets management
+---
 
-Executive-ready UI formatting and consistency
+## Evidence and Verification
 
-🛠 Technology Stack
+This repository contains verifiable implementation artifacts.
 
-Databricks
+### Notebooks
 
-Delta Lake
+```
+notebooks/01_marketing_kpi_revenue_prediction.ipynb
+```
 
-PySpark
+Includes:
 
-Databricks SQL Warehouse
+* KPI computation
+* ML training
+* Segmentation logic
 
-LangGraph
+---
 
-LangChain
+### Screenshots (/screenshots)
 
-OpenAI API
+* kpi_table.PNG — KPI metrics layer
+* Graphique clusters.PNG — Campaign clusters visualization
+* Graphique et commentaires clusters.PNG — Cluster interpretation
+* Tableau des clusters.PNG — Campaign performance grouping
+* ai_marketing_decision_platform.png — End-to-end architecture
 
-Streamlit
+These artifacts demonstrate a fully functional analytics and AI pipeline.
 
-scikit-learn
+---
 
-Python
+## Applied AI Relevance
 
-SQL
+This platform demonstrates core Applied AI and AI Engineering capabilities:
 
-🔮 Future Improvements
+* Data pipeline engineering (PySpark, Delta Lake)
+* Feature engineering and KPI layer design
+* Machine learning model training and deployment
+* Structured RAG knowledge base design
+* AI-ready data architecture
+* Autonomous agent design with LangGraph (tool use, intent routing, planning)
+* Integration readiness for LLM assistants and AI agents
 
-Hybrid RAG (vector + structured)
+---
 
-Agent evaluation framework
+## Technology Stack
 
-Budget optimization with constraints
+* Databricks
+* Delta Lake
+* PySpark
+* MLlib
+* Microsoft Fabric compatible
+* Streamlit
+* Python
+* SQL
 
-API deployment version
+LLM integration:
 
-Azure OpenAI integration
+* LangGraph (agent orchestration)
+* LangChain (tool framework)
+* GPT-4o-mini (OpenAI)
+* Databricks Genie (Lakehouse native Generative AI)
+* Databricks Lakehouse AI
+* Databricks SQL AI Functions
 
-👤 Author = Me
+Compatible with external LLMs:
 
-AI-ready marketing analytics and autonomous decision platform built using modern data and AI engineering practices.
+* Azure OpenAI
+* OpenAI API
+* LangChain
+
+---
+
+## Future Improvements
+
+* Add vector embeddings for hybrid structured/unstructured RAG
+* Deploy as API endpoint
+* Add automated evaluation pipeline
+* Integrate with Azure OpenAI for live assistant
+* Deploy on Microsoft Fabric
+* Export PDF reports
+* Automated alerts (ROI below threshold)
+* Multi-table agent support
+
+---
+
+## Author
+
+AI-ready marketing analytics and decision platform built using modern data and AI engineering practices.
