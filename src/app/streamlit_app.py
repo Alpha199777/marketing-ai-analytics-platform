@@ -61,19 +61,19 @@ def safe_div(a, b):
 
 def format_num(x):
     try:
-        return f"{float(x):,.0f}"
+        return f"{int(round(float(x))):,}".replace(",", " ")
     except Exception:
         return "—"
 
 def format_money(x):
     try:
-        return f"{float(x):,.0f} €"
+        return f"CHF {int(round(float(x))):,}".replace(",", " ")
     except Exception:
         return "—"
 
 def format_pct(x):
     try:
-        return f"{float(x)*100:.2f}%"
+        return f"{float(x)*100:.1f}%"
     except Exception:
         return "—"
 
@@ -292,8 +292,8 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
         k2.metric("Clicks", format_num(total_clicks))
         k3.metric("Impressions", format_num(total_impr))
         k4.metric("CTR moyen", format_pct(ctr_avg))
-        k5.metric("€ / Click (moy.)", format_money(rpc_avg))
-        k6.metric("€ / 1k Impr (moy.)", format_money(rpm_avg))
+        k5.metric("CHF / Click (moy.)", format_money(rpc_avg))
+        k6.metric("CHF / 1k Impr (moy.)", format_money(rpm_avg))
 
         st.divider()
 
@@ -381,7 +381,7 @@ with tab2:
 
         a, b, c = st.columns(3)
         a.metric("Spend total", format_money(spend_total))
-        b.metric("ROAS moyen", f"{roas_avg:.2f}x" if np.isfinite(roas_avg) else "—")
+        b.metric("ROAS moyen", f"{roas_avg:.1f}x" if np.isfinite(roas_avg) else "—")
         c.metric("ROI moyen", format_pct(roi_avg) if np.isfinite(roi_avg) else "—")
 
         st.markdown(
@@ -658,13 +658,13 @@ with tab4:
             dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
 
             if roi > 1:
-                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables → scaler en priorité. ROI moyen : **{roi:.2f}**")
+                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables → scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
             elif roi > 0:
-                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables → optimiser et développer. ROI moyen : **{roi:.2f}**")
+                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables → optimiser et développer. ROI moyen : **{roi*100:.1f}%**")
             elif roi > -0.5:
-                st.warning(f"{dot} **Cluster {cluster}** : campagnes peu performantes → optimisation recommandée. ROI moyen : **{roi:.2f}**")
+                st.warning(f"{dot} **Cluster {cluster}** : campagnes peu performantes → optimisation recommandée. ROI moyen : **{roi*100:.1f}%**")
             else:
-                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables → à revoir ou arrêter. ROI moyen : **{roi:.2f}**")
+                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables → à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
         
         
         # ============================
@@ -680,12 +680,12 @@ with tab4:
         
         st.write(
             f"Le cluster le plus performant est le Cluster {best_cluster['cluster']} "
-            f"avec ROI moyen de {best_cluster['roi']:.2f}."
+            f"avec ROI moyen de {best_cluster['roi']*100:.1f}%."
         )
         
         st.write(
             f"Le cluster le moins performant est le Cluster {worst_cluster['cluster']} "
-            f"avec ROI moyen de {worst_cluster['roi']:.2f}."
+            f"avec ROI moyen de {worst_cluster['roi']*100:.1f}%."
         )
         
         st.write(
@@ -845,7 +845,7 @@ with tab5:
             }]
             summary = (f"Simulation +{budget_increase_pct}% budget ({category}) : "
                       f"revenue {rev_base:,.0f} → {rev_sim:,.0f} "
-                      f"(+{delta_pct:.1f}%, ROI incrémental : {roi_sim:.2f})")
+                      f"(+{delta_pct:.1f}%, ROI incrémental : {roi_sim*100:.1f}%)")
             return {"rows": result_rows, "summary": summary}
 
         _TOOL_MAP = {t.name: t for t in [_underperforming, _rank, _agg, _simulate]}
@@ -904,7 +904,14 @@ with tab5:
                 ctx_parts.append(f"TOOL: {r['tool']}\nSUMMARY: {out.get('summary','')}\nDATA:\n{_fmt(out.get('rows', []))}")
             ctx = "\n\n".join(ctx_parts) if ctx_parts else "Aucun résultat."
             msg = _llm.invoke([
-                _SM(content="Assistant marketing analytique. Réponds en français, orienté business. Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."),
+                _SM(content="""Assistant marketing analytique. Réponds en français, orienté business.
+RÈGLES DE FORMATAGE STRICTES :
+- Tous les montants monétaires : format CHF avec espaces (ex: CHF 3 098, CHF 42 889) — jamais de virgule décimale pour les montants
+- Nombres entiers (clicks, impressions, leads) : séparés par des espaces (ex: 2 999 919)
+- ROI et CTR : en pourcentage avec 1 décimale (ex: ROI 307.0%, CTR 0.9%) — multiplier par 100 si nécessaire
+- ROAS : 1 décimale avec x (ex: ROAS 2.4x)
+- Ne jamais afficher de décimales pour les montants (3098.45 → CHF 3 098)
+Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."""),
                 _HM(content=f"Question: {state.user_question}\n\nDonnées:\n{ctx}")
             ])
             state.final_answer = msg.content
@@ -928,12 +935,13 @@ with tab5:
 
         # Exemples de questions
         st.markdown("**💡 Exemples de questions :**")
-        ex_cols = st.columns(3)
         examples = [
             "Top 5 campagnes par ROI",
             "Campagnes sous-performantes (ROI < 0)",
             "Analyse par catégorie",
+            "Simule +20% budget sur social",
         ]
+        ex_cols = st.columns(4)
         for i, ex in enumerate(examples):
             with ex_cols[i]:
                 if st.button(ex, key=f"agent_ex_{i}"):
