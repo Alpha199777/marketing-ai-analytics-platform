@@ -658,14 +658,13 @@ with tab4:
             dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
 
             if roi > 1:
-                label = "campagnes très rentables → scaler en priorité."
-                st.success(f"{dot} **Cluster {cluster}** ({color}) : {label} ROI moyen : **{roi:.2f}**")
+                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables → scaler en priorité. ROI moyen : **{roi:.2f}**")
             elif roi > 0:
-                st.info(f"{dot} **Cluster {cluster}** ({color}) : campagnes rentables → optimiser et développer. ROI moyen : **{roi:.2f}**")
+                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables → optimiser et développer. ROI moyen : **{roi:.2f}**")
             elif roi > -0.5:
-                st.warning(f"{dot} **Cluster {cluster}** ({color}) : campagnes peu performantes → optimisation recommandée. ROI moyen : **{roi:.2f}**")
+                st.warning(f"{dot} **Cluster {cluster}** : campagnes peu performantes → optimisation recommandée. ROI moyen : **{roi:.2f}**")
             else:
-                st.error(f"{dot} **Cluster {cluster}** ({color}) : campagnes non rentables → à revoir ou arrêter. ROI moyen : **{roi:.2f}**")
+                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables → à revoir ou arrêter. ROI moyen : **{roi:.2f}**")
         
         
         # ============================
