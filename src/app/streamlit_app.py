@@ -179,12 +179,13 @@ dff = df.loc[mask].copy()
 # ----------------------------
 # Tabs
 # ----------------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering", "🤖 Agent AI"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering", "🧠 Agent AI"])
 
 # ============================================================
 # TAB 1 — DASHBOARD
 # ============================================================
-st.info("""
+with tab1:
+    st.info("""
 Ce dashboard permet d'analyser la performance des campagnes marketing :
 
 • Identifier les campagnes les plus rentables  
@@ -192,7 +193,6 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 • Optimiser l’allocation du budget marketing  
 • Supporter la prise de décision data-driven
 """)
-with tab1:
     total_revenue = dff["revenue"].sum()
     total_clicks = dff["clicks"].sum()
     total_impr = dff["impressions"].sum()
@@ -204,166 +204,166 @@ with tab1:
     # ----------------------------
 # KPI explanations (portfolio friendly)
 # ----------------------------
-with st.expander("📖 Comprendre les indicateurs (KPI)"):
-    
-    col1, col2 = st.columns(2)
+    with st.expander("📖 Comprendre les indicateurs (KPI)"):
+        
+        col1, col2 = st.columns(2)
 
-    with col1:
-        st.markdown("""
-        ### 📊 CTR (Click-Through Rate)
-        
-        **Définition :**
-        
-        CTR = Clicks / Impressions
-        
-        **Ce que ça mesure :**
-        
-        → Le % de personnes qui cliquent après avoir vu la campagne.
-        
-        **Interprétation :**
-        
-        • CTR élevé → campagne attractive  
-        • CTR faible → message ou ciblage à améliorer  
-        
-        **Exemple :**
-        
-        1 000 impressions, 20 clicks → CTR = 2%
-        """)
+        with col1:
+            st.markdown("""
+            ### 📊 CTR (Click-Through Rate)
+            
+            **Définition :**
+            
+            CTR = Clicks / Impressions
+            
+            **Ce que ça mesure :**
+            
+            → Le % de personnes qui cliquent après avoir vu la campagne.
+            
+            **Interprétation :**
+            
+            • CTR élevé → campagne attractive  
+            • CTR faible → message ou ciblage à améliorer  
+            
+            **Exemple :**
+            
+            1 000 impressions, 20 clicks → CTR = 2%
+            """)
 
-        st.markdown("""
-        ### 💶 € / Click (moyen)
-        
-        **Définition :**
-        
-        Revenue / Clicks
-        
-        **Ce que ça mesure :**
-        
-        → combien chaque click rapporte en moyenne.
-        
-        **Interprétation :**
-        
-        • élevé → traffic de qualité  
-        • faible → trafic peu qualifié
-        """)
+            st.markdown("""
+            ### 💶 € / Click (moyen)
+            
+            **Définition :**
+            
+            Revenue / Clicks
+            
+            **Ce que ça mesure :**
+            
+            → combien chaque click rapporte en moyenne.
+            
+            **Interprétation :**
+            
+            • élevé → traffic de qualité  
+            • faible → trafic peu qualifié
+            """)
 
-    with col2:
-        st.markdown("""
-        ### 👁️ € / 1k Impressions (RPM)
-        
-        **Définition :**
-        
-        Revenue / Impressions × 1000
-        
-        **Ce que ça mesure :**
-        
-        → revenu généré pour 1 000 vues.
-        
-        **Interprétation :**
-        
-        • élevé → campagne efficace  
-        • faible → mauvaise conversion
-        """)
+        with col2:
+            st.markdown("""
+            ### 👁️ € / 1k Impressions (RPM)
+            
+            **Définition :**
+            
+            Revenue / Impressions × 1000
+            
+            **Ce que ça mesure :**
+            
+            → revenu généré pour 1 000 vues.
+            
+            **Interprétation :**
+            
+            • élevé → campagne efficace  
+            • faible → mauvaise conversion
+            """)
 
-        st.markdown("""
-        ### 📈 Revenue total
-        
-        **Définition :**
-        
-        somme du revenu généré.
-        
-        **Utilisation business :**
-        
-        → identifier les campagnes les plus rentables.
-        """)
+            st.markdown("""
+            ### 📈 Revenue total
+            
+            **Définition :**
+            
+            somme du revenu généré.
+            
+            **Utilisation business :**
+            
+            → identifier les campagnes les plus rentables.
+            """)
 
-        st.markdown("""
-        ### 🖱️ Clicks & 👁️ Impressions
-        
-        **Impressions :**
-        nombre de fois où la campagne est affichée
-        
-        **Clicks :**
-        nombre de clics générés
-        
-        Ensemble, ils mesurent la performance marketing.
-        """)
-    k1.metric("Revenue total", format_money(total_revenue))
-    k2.metric("Clicks", format_num(total_clicks))
-    k3.metric("Impressions", format_num(total_impr))
-    k4.metric("CTR moyen", format_pct(ctr_avg))
-    k5.metric("€ / Click (moy.)", format_money(rpc_avg))
-    k6.metric("€ / 1k Impr (moy.)", format_money(rpm_avg))
+            st.markdown("""
+            ### 🖱️ Clicks & 👁️ Impressions
+            
+            **Impressions :**
+            nombre de fois où la campagne est affichée
+            
+            **Clicks :**
+            nombre de clics générés
+            
+            Ensemble, ils mesurent la performance marketing.
+            """)
+        k1.metric("Revenue total", format_money(total_revenue))
+        k2.metric("Clicks", format_num(total_clicks))
+        k3.metric("Impressions", format_num(total_impr))
+        k4.metric("CTR moyen", format_pct(ctr_avg))
+        k5.metric("€ / Click (moy.)", format_money(rpc_avg))
+        k6.metric("€ / 1k Impr (moy.)", format_money(rpm_avg))
 
-    st.divider()
+        st.divider()
 
-    left, right = st.columns([1.35, 1])
+        left, right = st.columns([1.35, 1])
 
-    with left:
-        st.subheader("📈 Tendance (au choix)")
+        with left:
+            st.subheader("📈 Tendance (au choix)")
 
-        ts = (
-            dff.groupby(pd.Grouper(key="date", freq="D"))
-            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
-            .reset_index()
-            .sort_values("date")
-        )
-        ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
-
-        metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
-        if ts.empty:
-            st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
-        else:
-            fig = px.line(ts, x="date", y=metric, markers=True)
-            fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
-            st.plotly_chart(fig, use_container_width=True)
-
-    with right:
-        st.subheader("🏆 Top campagnes (table + bar)")
-
-        by_campaign = (
-            dff.groupby("campaign", as_index=False)
-            .agg(
-                revenue=("revenue", "sum"),
-                clicks=("clicks", "sum"),
-                impressions=("impressions", "sum"),
+            ts = (
+                dff.groupby(pd.Grouper(key="date", freq="D"))
+                .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
+                .reset_index()
+                .sort_values("date")
             )
-        )
-        by_campaign["ctr"] = safe_div(by_campaign["clicks"], by_campaign["impressions"])
-        by_campaign["rev_per_click"] = safe_div(by_campaign["revenue"], by_campaign["clicks"])
+            ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        sort_by = st.selectbox("Trier par", ["revenue", "clicks", "impressions", "ctr", "rev_per_click"], index=0)
-        top = by_campaign.sort_values(sort_by, ascending=False).head(top_n).copy()
+            metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
+            if ts.empty:
+                st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
+            else:
+                fig = px.line(ts, x="date", y=metric, markers=True)
+                fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
+                st.plotly_chart(fig, use_container_width=True)
 
-        st.dataframe(
-            top.rename(columns={
-                "rev_per_click": "€/click"
-            }),
-            use_container_width=True,
-            height=220
-        )
+        with right:
+            st.subheader("🏆 Top campagnes (table + bar)")
 
-        fig2 = px.bar(top, x="campaign", y=sort_by)
-        fig2.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig2, use_container_width=True)
+            by_campaign = (
+                dff.groupby("campaign", as_index=False)
+                .agg(
+                    revenue=("revenue", "sum"),
+                    clicks=("clicks", "sum"),
+                    impressions=("impressions", "sum"),
+                )
+            )
+            by_campaign["ctr"] = safe_div(by_campaign["clicks"], by_campaign["impressions"])
+            by_campaign["rev_per_click"] = safe_div(by_campaign["revenue"], by_campaign["clicks"])
 
-    st.divider()
+            sort_by = st.selectbox("Trier par", ["revenue", "clicks", "impressions", "ctr", "rev_per_click"], index=0)
+            top = by_campaign.sort_values(sort_by, ascending=False).head(top_n).copy()
 
-    if show_table:
-        st.subheader("📄 Données filtrées")
-        cols = ["date", "campaign", "clicks", "impressions", "revenue", "ctr", "rev_per_click", "rev_per_1k_impr"]
-        extra = [c for c in ["spend", "roi", "roas", "leads", "orders"] if c in dff.columns]
-        cols = cols + extra
+            st.dataframe(
+                top.rename(columns={
+                    "rev_per_click": "€/click"
+                }),
+                use_container_width=True,
+                height=220
+            )
 
-        table = dff[cols].sort_values("date", ascending=False)
-        st.dataframe(table, use_container_width=True, height=420)
+            fig2 = px.bar(top, x="campaign", y=sort_by)
+            fig2.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10))
+            st.plotly_chart(fig2, use_container_width=True)
 
-        st.download_button(
-            "⬇️ Télécharger les données filtrées (CSV)",
-            data=table.to_csv(index=False).encode("utf-8"),
-            file_name="marketing_filtered.csv",
-            mime="text/csv"
-        )
+        st.divider()
+
+        if show_table:
+            st.subheader("📄 Données filtrées")
+            cols = ["date", "campaign", "clicks", "impressions", "revenue", "ctr", "rev_per_click", "rev_per_1k_impr"]
+            extra = [c for c in ["spend", "roi", "roas", "leads", "orders"] if c in dff.columns]
+            cols = cols + extra
+
+            table = dff[cols].sort_values("date", ascending=False)
+            st.dataframe(table, use_container_width=True, height=420)
+
+            st.download_button(
+                "⬇️ Télécharger les données filtrées (CSV)",
+                data=table.to_csv(index=False).encode("utf-8"),
+                file_name="marketing_filtered.csv",
+                mime="text/csv"
+            )
 
 # ============================================================
 # TAB 2 — ROI/ROAS
@@ -595,25 +595,17 @@ with tab4:
     # Graphique clustering PRO
     # ============================
         
+        agg["cluster_label"] = agg["cluster"].astype(str)
+        cluster_color_map = {str(i): c for i, c in enumerate(["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"])}
         fig = px.scatter(
             agg,
             x="roi",
             y="revenue",
-        
-            color="cluster",
+            color="cluster_label",
             size="revenue",
-        
             hover_name="campaign",
-        
-            color_discrete_map={
-                0: "#2ecc71",  # vert
-                1: "#3498db",  # bleu
-                2: "#f39c12",  # orange
-                3: "#e74c3c",  # rouge
-                4: "#9b59b6",  # violet
-                5: "#1abc9c"   # turquoise
-            },
-        
+            color_discrete_map=cluster_color_map,
+            labels={"cluster_label": "Cluster"},
             size_max=40
         )
         
@@ -717,7 +709,7 @@ with tab4:
 # TAB 5 — AGENT AI
 # ============================================================
 with tab5:
-    st.subheader("🤖 Agent Autonome Marketing")
+    st.subheader("🧠 Agent Autonome Marketing")
     st.caption("Pose une question en langage naturel — l'agent interroge ta base Databricks et répond.")
 
     missing_vars = [v for v in ["DATABRICKS_SERVER_HOSTNAME", "DATABRICKS_HTTP_PATH", "DATABRICKS_ACCESS_TOKEN", "OPENAI_API_KEY"] if not os.environ.get(v)]
