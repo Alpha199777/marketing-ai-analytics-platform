@@ -646,36 +646,26 @@ with tab4:
         # ============================
         
         st.markdown("### 🧠 Commentaire (portfolio)")
-        
+
+        # Palette identique au graphique
+        PALETTE = ["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]
+        EMOJI_DOT = ["🟢","🔵","🟠","🔴","🟣","🩵"]
+
         for _, row in summary.iterrows():
-        
-            cluster = row["cluster"]
+            cluster = int(row["cluster"])
             roi = row["roi"]
-            revenue = row["revenue"]
-        
+            color = PALETTE[cluster % len(PALETTE)]
+            dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
+
             if roi > 1:
-                st.success(
-                    f"🔵 Cluster {cluster} : campagnes très rentables "
-                    f"(ROI {roi:.2f}) → scaler en priorité."
-                )
-        
+                label = "campagnes très rentables → scaler en priorité."
+                st.success(f"{dot} **Cluster {cluster}** ({color}) : {label} ROI moyen : **{roi:.2f}**")
             elif roi > 0:
-                st.info(
-                    f"🟢 Cluster {cluster} : campagnes rentables "
-                    f"(ROI {roi:.2f}) → optimiser et développer."
-                )
-        
+                st.info(f"{dot} **Cluster {cluster}** ({color}) : campagnes rentables → optimiser et développer. ROI moyen : **{roi:.2f}**")
             elif roi > -0.5:
-                st.warning(
-                    f"🟠 Cluster {cluster} : campagnes peu performantes "
-                    f"(ROI {roi:.2f}) → optimisation recommandée."
-                )
-        
+                st.warning(f"{dot} **Cluster {cluster}** ({color}) : campagnes peu performantes → optimisation recommandée. ROI moyen : **{roi:.2f}**")
             else:
-                st.error(
-                    f"🔴 Cluster {cluster} : campagnes non rentables "
-                    f"(ROI {roi:.2f}) → à revoir ou arrêter."
-                )
+                st.error(f"{dot} **Cluster {cluster}** ({color}) : campagnes non rentables → à revoir ou arrêter. ROI moyen : **{roi:.2f}**")
         
         
         # ============================
