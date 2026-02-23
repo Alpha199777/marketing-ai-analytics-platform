@@ -1,4 +1,8 @@
-This project transforms raw marketing campaign data into a production-ready AI analytics and decision platform using:
+# Marketing AI Analytics Platform (Databricks / Microsoft Fabric Ready)
+
+## Overview
+
+This project demonstrates how to transform raw marketing campaign data into a production-ready analytics and AI decision platform using Databricks, Delta Lake, and PySpark MLlib.
 
 Databricks + Delta Lake
 
@@ -279,6 +283,6 @@ API deployment version
 
 Azure OpenAI integration
 
-👤 Author
+👤 Author = Me
 
 AI-ready marketing analytics and autonomous decision platform built using modern data and AI engineering practices.
