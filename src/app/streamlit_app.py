@@ -699,7 +699,7 @@ with tab4:
 # ============================================================
 with tab5:
     st.subheader("🧠 Agent Autonome Marketing")
-    st.caption("Pose une question en langage naturel — l'agent interroge ta base Databricks et répond.")
+    st.caption("Pose une question en langage naturel — l'agent interroge la base Databricks et répond.")
 
     missing_vars = [v for v in ["DATABRICKS_SERVER_HOSTNAME", "DATABRICKS_HTTP_PATH", "DATABRICKS_ACCESS_TOKEN", "OPENAI_API_KEY"] if not os.environ.get(v)]
 
