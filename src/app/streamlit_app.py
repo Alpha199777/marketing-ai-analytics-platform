@@ -231,7 +231,7 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
             """)
 
             st.markdown("""
-            ### 💶 € / Click (moyen)
+            ### 💶 CHF / Click (moyen)
             
             **Définition :**
             
@@ -249,7 +249,7 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 
         with col2:
             st.markdown("""
-            ### 👁️ € / 1k Impressions (RPM)
+            ### 👁️ CHF / 1k Impressions (RPM)
             
             **Définition :**
             
@@ -337,7 +337,7 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 
             st.dataframe(
                 top.rename(columns={
-                    "rev_per_click": "€/click"
+                    "rev_per_click": "CHF/click"
                 }),
                 use_container_width=True,
                 height=220
@@ -387,7 +387,7 @@ with tab2:
         st.markdown(
             """
 **Interprétation rapide :**
-- **ROAS = revenue / spend** → “combien je récupère pour 1€ dépensé”
+- **ROAS = revenue / spend** → “combien je récupère pour 1CHF dépensé”
 - **ROI = (revenue - spend) / spend** → “mon gain net relatif”
             """
         )
