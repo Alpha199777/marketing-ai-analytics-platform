@@ -649,7 +649,7 @@ with tab4:
 
         # Palette identique au graphique
         PALETTE = ["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]
-        EMOJI_DOT = ["🟢","🔵","🟠","🟣","🔴","🩵"]
+        EMOJI_DOT = ["🟣","🔵","🟠","🟢","🔴","🩵"]
 
         for _, row in summary.iterrows():
             cluster = int(row["cluster"])
