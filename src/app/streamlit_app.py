@@ -1037,12 +1037,10 @@ Revenue: CHF {spend * roas:,.0f}
 
             except Exception as e:
                 st.error(f"Error: {e}")
-```
 
-Deux choses importantes avant de déployer :
+st.success("✅ Fine-tuned LLM Recommendation")
+                st.markdown(f"```\n{result}\n```")
+                st.caption("Model: [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama) — TinyLlama 1.1B + LoRA (PEFT)")
 
-1. Ajoutez dans `requirements.txt` :
-```
-peft
-accelerate
-                    
+            except Exception as e:
+                st.error(f"Error: {e}")
