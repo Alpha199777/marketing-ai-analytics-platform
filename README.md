@@ -401,6 +401,22 @@ Compatible with external LLMs:
 
 ---
 
+## 🧬 Fine-Tuning LoRA
+
+TinyLlama 1.1B fine-tuned with LoRA (PEFT/TRL) on 500+ proprietary marketing KPI examples.
+
+**Model on HuggingFace Hub:** [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)
+
+| Metric | Value |
+|--------|-------|
+| Technique | LoRA (r=8, alpha=16) |
+| Trainable params | 0.10% (1.1M / 1.1B) |
+| Val loss | 0.24 |
+| Training time | 5 min — T4 GPU (Google Colab) |
+
+Example inference:
+- ROI = -20% → `REVIEW immediately` ✅
+- ROI = +381% → `SCALE immediately` ✅
 ## Future Improvements
 
 * Add vector embeddings for hybrid structured/unstructured RAG
