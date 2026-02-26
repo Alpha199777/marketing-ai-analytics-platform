@@ -1,4 +1,4 @@
-# Marketing AI Analytics Platform (Databricks / Microsoft Fabric Ready)
+# Applied AI Analytics Platform – ML & Decision Intelligence (Databricks / Fabric Ready)
 
 ## Overview
 
