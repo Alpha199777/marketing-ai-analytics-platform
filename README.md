@@ -233,6 +233,7 @@ This enables enterprise-safe AI grounded in real business data.
 | 🔮 **Prediction** | RandomForest revenue prediction with scenario simulation |
 | 🧩 **Clustering** | KMeans campaign segmentation with color-coded commentary |
 | 🧠 **Agent AI** | Autonomous LangGraph agent — natural language queries on Databricks |
+| 🧬 **Fine-tuned AI** | TinyLlama 1.1B + LoRA — domain-specific marketing recommendations |
 
 ### Live Application Demo
 
