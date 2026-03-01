@@ -875,7 +875,8 @@ with tab5:
                 "- rank_campaigns(metric, direction, limit)\n"
                 "- aggregate_by_dimension(group_by)\n"
                 "- simulate_budget(budget_increase_pct, category)\n"
-                'Retourne UNIQUEMENT un JSON valide, ex: [{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":5}}]'
+                'Retourne UNIQUEMENT un JSON valide, ex: [{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":5}}]\n'
+                'Si la question compare deux plateformes, génère 2 tool calls séparés, un par plateforme.'
             )
         
             try:
@@ -920,14 +921,23 @@ with tab5:
                 ctx_parts.append(f"TOOL: {r['tool']}\nSUMMARY: {out.get('summary','')}\nDATA:\n{_fmt(out.get('rows', []))}")
             ctx = "\n\n".join(ctx_parts) if ctx_parts else "Aucun résultat."
             msg = _llm.invoke([
-                _SM(content="""Assistant marketing analytique. Réponds en français, orienté business.
-RÈGLES DE FORMATAGE STRICTES :
-- Tous les montants monétaires : format CHF avec espaces (ex: CHF 3 098, CHF 42 889) — jamais de virgule décimale pour les montants
-- Nombres entiers (clicks, impressions, leads) : séparés par des espaces (ex: 2 999 919)
-- ROI et CTR : en pourcentage avec 1 décimale (ex: ROI 307.0%, CTR 0.9%) — multiplier par 100 si nécessaire
-- ROAS : 1 décimale avec x (ex: ROAS 2.4x)
-- Ne jamais afficher de décimales pour les montants (3098.45 → CHF 3 098)
-Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."""),
+                # remplacez le _HM par :
+            _HM(content=f"""Question: {state.user_question}
+            
+            IMPORTANT: Réponds UNIQUEMENT par rapport aux campagnes explicitement mentionnées dans la question.
+            Si la question cite "facebook_retargeting" et "instagram", ne parle que de ces campagnes-là.
+            
+            Données disponibles:
+            {ctx}""")
+
+            RÈGLES DE FORMATAGE STRICTES :
+            - Tous les montants monétaires : format CHF avec espaces (ex: CHF 3 098, CHF 42 889) — jamais de virgule décimale pour les montants
+            - Nombres entiers (clicks, impressions, leads) : séparés par des espaces (ex: 2 999 919)
+            - ROI et CTR : en pourcentage avec 1 décimale (ex: ROI 307.0%, CTR 0.9%) — multiplier par 100 si nécessaire
+            - ROAS : 1 décimale avec x (ex: ROAS 2.4x)
+            - Ne jamais afficher de décimales pour les montants (3098.45 → CHF 3 098)
+            Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."""),
+                            
                 _HM(content=f"Question: {state.user_question}\n\nDonnées:\n{ctx}")
             ])
             state.final_answer = msg.content
