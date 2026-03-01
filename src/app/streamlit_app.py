@@ -877,19 +877,20 @@ with tab5:
                 "- simulate_budget(budget_increase_pct, category)\n"
                 'Retourne UNIQUEMENT un JSON valide, ex: [{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":5}}]'
             )
-                    #récupérer les campagnes réelles du dataframe filtré
-                    try:
-                        campaigns_list = dff["campaign"].dropna().unique().tolist()
-                    except Exception:
-                        campaigns_list = []
-                
-                    msg = _llm.invoke([
-                        _SM(content=system_prompt),
-                        _HM(content=f"""Question: {state.user_question}
-                Intention: {state.intent}
-                Campagnes disponibles dans les données: {campaigns_list}
-                → Utilise UNIQUEMENT ces noms de campagnes exacts dans tes arguments.""")
-            ])
+        
+            try:
+                campaigns_list = dff["campaign"].dropna().unique().tolist()
+            except Exception:
+                campaigns_list = []
+        
+            msg = _llm.invoke([
+                _SM(content=system_prompt),
+                _HM(content=f"""Question: {state.user_question}
+        Intention: {state.intent}
+        Campagnes disponibles dans les données: {campaigns_list}
+        → Utilise UNIQUEMENT ces noms de campagnes exacts dans tes arguments.""")
+            ])   
+            
             msg = _llm.invoke([
                 _SM(content=system_prompt),
                 _HM(content=f"Question: {state.user_question}\nIntention: {state.intent}")
