@@ -1,0 +1,3 @@
+[submodule "src/finetuning"]
+	path = src/finetuning
+	url = https://github.com/Alpha199777/marketing-finetuning-private.git
