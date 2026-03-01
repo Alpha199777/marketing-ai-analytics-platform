@@ -456,7 +456,7 @@ Ce modèle permet de :
         sim = pd.DataFrame([user_vals])
         pred_sim = np.expm1(model.predict(sim)[0])
         st.success(f"📈 Revenue prédit : **{format_money(pred_sim)}**")
-        st.info("💡 Utiliser les prédictions comme indication, pas comme valeur exacte.")
+        st.info("💡 Erreur élevée : utiliser les prédictions comme indication, pas comme valeur exacte. **démo** (meilleur avec +features: spend/leads/orders, et +données).")
 
 # ============================================================
 # TAB 4 - Clustering
