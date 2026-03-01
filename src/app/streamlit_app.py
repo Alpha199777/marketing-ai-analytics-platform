@@ -31,13 +31,8 @@ def norm_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def map_schema(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Supporte plusieurs schémas:
-    - light: date, campaign, clicks, impressions, revenue
-    - enrichi: c_date/campaign_name/mark_spent/leads/orders/...
-    """
     df = norm_cols(df)
-
+    df["campaign"] = df["campaign"].str.lower().str.strip()
     rename_map = {
         "c_date": "date",
         "campaign_name": "campaign",
@@ -85,15 +80,12 @@ def ensure_min_columns(df: pd.DataFrame):
         st.stop()
 
 def compute_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    # Date
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date"]).copy()
 
-    # Numerics (min)
     for c in ["clicks", "impressions", "revenue"]:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-    # Optionnels
     if "spend" in df.columns:
         df["spend"] = pd.to_numeric(df["spend"], errors="coerce").fillna(0)
     if "leads" in df.columns:
@@ -101,15 +93,13 @@ def compute_metrics(df: pd.DataFrame) -> pd.DataFrame:
     if "orders" in df.columns:
         df["orders"] = pd.to_numeric(df["orders"], errors="coerce").fillna(0)
 
-    # CTR
     df["ctr"] = safe_div(df["clicks"], df["impressions"])
     df["rev_per_click"] = safe_div(df["revenue"], df["clicks"])
     df["rev_per_1k_impr"] = safe_div(df["revenue"] * 1000, df["impressions"])
 
-    # ROI / ROAS si spend présent
     if "spend" in df.columns:
-        df["roas"] = safe_div(df["revenue"], df["spend"])  # revenue/spend
-        df["roi"] = safe_div(df["revenue"] - df["spend"], df["spend"])  # (rev-spend)/spend
+        df["roas"] = safe_div(df["revenue"], df["spend"])
+        df["roi"] = safe_div(df["revenue"] - df["spend"], df["spend"])
 
     return df
 
@@ -124,13 +114,10 @@ st.caption("📊 KPI • ROI/ROAS • Prediction • Clustering (portfolio pro)"
 # ----------------------------
 with st.sidebar:
     st.header("⚙️ Paramètres")
-
     data_mode = st.radio("Source de données", ["CSV du repo (recommandé)", "Uploader un CSV"], index=0)
-
     uploaded_file = None
     if data_mode == "Uploader un CSV":
         uploaded_file = st.file_uploader("Uploader un fichier CSV", type=["csv"])
-
     st.divider()
     st.subheader("🧪 Options")
     show_table = st.checkbox("Afficher la table détaillée", value=True)
@@ -140,7 +127,6 @@ with st.sidebar:
 # Load
 # ----------------------------
 if data_mode == "CSV du repo (recommandé)":
-    # 👉 Mets ici ton fichier enrichi si tu l'as nommé autrement
     df = load_csv("data/sample_marketing.csv")
 else:
     if uploaded_file is None:
@@ -189,8 +175,8 @@ with tab1:
 Ce dashboard permet d'analyser la performance des campagnes marketing :
 
 • Identifier les campagnes les plus rentables  
-• Comprendre l’efficacité des impressions et des clics  
-• Optimiser l’allocation du budget marketing  
+• Comprendre l'efficacité des impressions et des clics  
+• Optimiser l'allocation du budget marketing  
 • Supporter la prise de décision data-driven
 """)
     total_revenue = dff["revenue"].sum()
@@ -201,93 +187,48 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
     rpm_avg = np.nanmean(dff["rev_per_1k_impr"]) if len(dff) else np.nan
 
     k1, k2, k3, k4, k5, k6 = st.columns(6)
-    # ----------------------------
-# KPI explanations (portfolio friendly)
-# ----------------------------
-    with st.expander("📖 Comprendre les indicateurs (KPI)"):
-        
-        col1, col2 = st.columns(2)
 
+    with st.expander("📖 Comprendre les indicateurs (KPI)"):
+        col1, col2 = st.columns(2)
         with col1:
             st.markdown("""
-            ### 📊 CTR (Click-Through Rate)
-            
-            **Définition :**
-            
-            CTR = Clicks / Impressions
-            
-            **Ce que ça mesure :**
-            
-            → Le % de personnes qui cliquent après avoir vu la campagne.
-            
-            **Interprétation :**
-            
-            • CTR élevé → campagne attractive  
-            • CTR faible → message ou ciblage à améliorer  
-            
-            **Exemple :**
-            
-            1 000 impressions, 20 clicks → CTR = 2%
-            """)
-
+### 📊 CTR (Click-Through Rate)
+**Définition :** CTR = Clicks / Impressions  
+**Ce que ça mesure :** Le % de personnes qui cliquent après avoir vu la campagne.  
+**Interprétation :**  
+• CTR élevé → campagne attractive  
+• CTR faible → message ou ciblage à améliorer  
+**Exemple :** 1 000 impressions, 20 clicks → CTR = 2%
+""")
             st.markdown("""
-            ### 💶 CHF / Click (moyen)
-            
-            **Définition :**
-            
-            Revenue / Clicks
-            
-            **Ce que ça mesure :**
-            
-            → combien chaque click rapporte en moyenne.
-            
-            **Interprétation :**
-            
-            • élevé → traffic de qualité  
-            • faible → trafic peu qualifié
-            """)
-
+### 💶 CHF / Click (moyen)
+**Définition :** Revenue / Clicks  
+**Ce que ça mesure :** combien chaque click rapporte en moyenne.  
+**Interprétation :**  
+• élevé → traffic de qualité  
+• faible → trafic peu qualifié
+""")
         with col2:
             st.markdown("""
-            ### 👁️ CHF / 1k Impressions (RPM)
-            
-            **Définition :**
-            
-            Revenue / Impressions × 1000
-            
-            **Ce que ça mesure :**
-            
-            → revenu généré pour 1 000 vues.
-            
-            **Interprétation :**
-            
-            • élevé → campagne efficace  
-            • faible → mauvaise conversion
-            """)
-
+### 👁️ CHF / 1k Impressions (RPM)
+**Définition :** Revenue / Impressions x 1000  
+**Ce que ça mesure :** revenu généré pour 1 000 vues.  
+**Interprétation :**  
+• élevé → campagne efficace  
+• faible → mauvaise conversion
+""")
             st.markdown("""
-            ### 📈 Revenue total
-            
-            **Définition :**
-            
-            somme du revenu généré.
-            
-            **Utilisation business :**
-            
-            → identifier les campagnes les plus rentables.
-            """)
-
+### 📈 Revenue total
+**Définition :** somme du revenu généré.  
+**Utilisation business :** identifier les campagnes les plus rentables.
+""")
             st.markdown("""
-            ### 🖱️ Clicks & 👁️ Impressions
-            
-            **Impressions :**
-            nombre de fois où la campagne est affichée
-            
-            **Clicks :**
-            nombre de clics générés
-            
-            Ensemble, ils mesurent la performance marketing.
-            """)
+### 🖱️ Clicks & 👁️ Impressions
+**Impressions :** nombre de fois où la campagne est affichée  
+**Clicks :** nombre de clics générés  
+Ensemble, ils mesurent la performance marketing.
+""")
+
         k1.metric("Revenue total", format_money(total_revenue))
         k2.metric("Clicks", format_num(total_clicks))
         k3.metric("Impressions", format_num(total_impr))
@@ -301,7 +242,6 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 
         with left:
             st.subheader("📈 Tendance (au choix)")
-
             ts = (
                 dff.groupby(pd.Grouper(key="date", freq="D"))
                 .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
@@ -309,7 +249,6 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
                 .sort_values("date")
             )
             ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
-
             metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
             if ts.empty:
                 st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
@@ -320,29 +259,15 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 
         with right:
             st.subheader("🏆 Top campagnes (table + bar)")
-
             by_campaign = (
                 dff.groupby("campaign", as_index=False)
-                .agg(
-                    revenue=("revenue", "sum"),
-                    clicks=("clicks", "sum"),
-                    impressions=("impressions", "sum"),
-                )
+                .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
             )
             by_campaign["ctr"] = safe_div(by_campaign["clicks"], by_campaign["impressions"])
             by_campaign["rev_per_click"] = safe_div(by_campaign["revenue"], by_campaign["clicks"])
-
             sort_by = st.selectbox("Trier par", ["revenue", "clicks", "impressions", "ctr", "rev_per_click"], index=0)
             top = by_campaign.sort_values(sort_by, ascending=False).head(top_n).copy()
-
-            st.dataframe(
-                top.rename(columns={
-                    "rev_per_click": "CHF/click"
-                }),
-                use_container_width=True,
-                height=220
-            )
-
+            st.dataframe(top.rename(columns={"rev_per_click": "CHF/click"}), use_container_width=True, height=220)
             fig2 = px.bar(top, x="campaign", y=sort_by)
             fig2.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10))
             st.plotly_chart(fig2, use_container_width=True)
@@ -354,10 +279,8 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
             cols = ["date", "campaign", "clicks", "impressions", "revenue", "ctr", "rev_per_click", "rev_per_1k_impr"]
             extra = [c for c in ["spend", "roi", "roas", "leads", "orders"] if c in dff.columns]
             cols = cols + extra
-
             table = dff[cols].sort_values("date", ascending=False)
             st.dataframe(table, use_container_width=True, height=420)
-
             st.download_button(
                 "⬇️ Télécharger les données filtrées (CSV)",
                 data=table.to_csv(index=False).encode("utf-8"),
@@ -370,7 +293,6 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 # ============================================================
 with tab2:
     st.subheader("💰 ROI / ROAS")
-
     if "spend" not in dff.columns:
         st.warning("Aucune colonne de coût/spend détectée (ex: `spend` ou `mark_spent`). ROI/ROAS indisponibles.")
         st.info("👉 Ajoute `mark_spent` dans ton CSV (ou renomme en `spend`) pour activer cette page.")
@@ -384,13 +306,11 @@ with tab2:
         b.metric("ROAS moyen", f"{roas_avg:.1f}x" if np.isfinite(roas_avg) else "-")
         c.metric("ROI moyen", format_pct(roi_avg) if np.isfinite(roi_avg) else "-")
 
-        st.markdown(
-            """
+        st.markdown("""
 **Interprétation rapide :**
-- **ROAS = revenue / spend** → “combien je récupère pour 1CHF dépensé”
-- **ROI = (revenue - spend) / spend** → “mon gain net relatif”
-            """
-        )
+- **ROAS = revenue / spend** "combien je récupère pour 1CHF dépensé"
+- **ROI = (revenue - spend) / spend** "mon gain net relatif"
+        """)
 
         by_campaign = (
             dff.groupby("campaign", as_index=False)
@@ -415,83 +335,32 @@ with tab2:
 # ============================================================
 with tab3:
     st.subheader("🔮 Prédire le revenue (RandomForest)")
-# ----------------------------
-# Explication des métriques ML
-# ----------------------------
     with st.expander("ℹ️ Comprendre les métriques de prédiction (R², MAPE, log)"):
         st.markdown("""
-    ### 🎯 Objectif
-    Ce modèle utilise le machine learning pour prédire le **revenue attendu d'une campagne marketing**.
-    
-    Il apprend la relation entre :
-    
-    • impressions  
-    • clicks  
-    • CTR  
-    • spend (si disponible)
-    
-    et le **revenue généré**.
-    
-    ---
-    
-    ### 📊 R² (coefficient de détermination)
-    
-    R² mesure la qualité globale du modèle.
-    
-    • R² = 1.0 → prédiction parfaite  
-    • R² = 0.5 → modèle correct  
-    • R² = 0 → modèle inutile  
-    • R² < 0 → modèle moins bon qu'une moyenne simple  
-    
-    👉 Dans le marketing réel :
-    
-    • 0.3 – 0.6 = bon modèle  
-    • 0.6 – 0.8 = très bon modèle  
-    • 0.8+ = excellent modèle  
-    
-    ---
-    
-    ### 📉 MAPE (%)
-    
-    MAPE = erreur moyenne en pourcentage.
-    
-    Exemple :
-    
-    MAPE = 20% → le modèle se trompe en moyenne de 20%
-    
-    Interprétation :
-    
-    • < 10% → excellent  
-    • 10–25% → bon  
-    • 25–50% → acceptable  
-    • > 50% → améliorable  
-    
-    ---
-    
-    ### 🔄 Pourquoi utiliser log(revenue)
-    
-    Le revenue marketing est souvent très asymétrique :
-    
-    • Beaucoup de petites campagnes  
-    • Quelques très grosses campagnes  
-    
-    Le log permet de :
-    
-    • stabiliser le modèle  
-    • éviter qu'une grosse campagne casse l'apprentissage  
-    • améliorer la précision globale  
-    
-    ---
-    
-    ### 💼 Business value
-    
-    Ce modèle permet de :
-    
-    • simuler une campagne avant lancement  
-    • estimer le revenue attendu  
-    • optimiser le budget marketing  
-    • aider à la prise de décision
-    """)
+### 🎯 Objectif
+Ce modèle utilise le machine learning pour prédire le **revenue attendu d'une campagne marketing**.
+
+Il apprend la relation entre impressions, clicks, CTR, spend (si disponible) et le **revenue généré**.
+
+---
+
+### 📊 R² (coefficient de détermination)
+R² mesure la qualité globale du modèle.
+• R² = 1.0 : prédiction parfaite | • R² = 0.5 : modèle correct | • R² < 0 : modèle inutile
+
+Dans le marketing réel : 0.3-0.6 = bon | 0.6-0.8 = très bon | 0.8+ = excellent
+
+---
+
+### 📉 MAPE (%)
+MAPE = erreur moyenne en pourcentage.
+• < 10% : excellent | • 10-25% : bon | • 25-50% : acceptable | • > 50% : améliorable
+
+---
+
+### 💼 Business value
+Simuler une campagne avant lancement, estimer le revenue attendu, optimiser le budget marketing.
+""")
 
     features_candidates = ["impressions", "clicks", "ctr"]
     if "spend" in dff.columns:
@@ -509,23 +378,14 @@ with tab3:
     else:
         X = dff[features].copy()
         y = dff["revenue"].copy()
-
-        # log transform
         y_log = np.log1p(y)
-
         X_train, X_test, y_train, y_test = train_test_split(X, y_log, test_size=0.2, random_state=42)
-
         model = RandomForestRegressor(n_estimators=300, random_state=42)
         model.fit(X_train, y_train)
-
         pred_log = model.predict(X_test)
         pred = np.expm1(pred_log)
         y_true = np.expm1(y_test)
-
-        # R² sur log-space (plus stable)
         r2 = model.score(X_test, y_test)
-
-        # MAPE stable: ignore y_true == 0
         y_true_np = np.array(y_true, dtype="float64")
         pred_np = np.array(pred, dtype="float64")
         mask = y_true_np > 0
@@ -548,8 +408,7 @@ with tab3:
         sim = pd.DataFrame([user_vals])
         pred_sim = np.expm1(model.predict(sim)[0])
         st.success(f"📈 Revenue prédit : **{format_money(pred_sim)}**")
-
-        st.info("💡 Erreur élevée : utiliser les prédictions comme indication, pas comme valeur exacte. **démo** (meilleur avec +features: spend/leads/orders, et +données).")
+        st.info("💡 Utiliser les prédictions comme indication, pas comme valeur exacte.")
 
 # ============================================================
 # TAB 4 - Clustering
@@ -557,7 +416,6 @@ with tab3:
 with tab4:
     st.subheader("🧩 Segmentation des campagnes (KMeans)")
 
-    # Agrégation par campagne (sinon trop bruité)
     grp_cols = ["revenue", "clicks", "impressions", "ctr"]
     if "spend" in dff.columns:
         grp_cols += ["spend", "roas", "roi"]
@@ -571,13 +429,10 @@ with tab4:
         st.warning("Pas assez de campagnes distinctes pour clusteriser (il faut au moins ~6).")
     else:
         k = st.slider("Nombre de clusters (k)", 2, 6, 4)
-
         features = [c for c in grp_cols if c in agg.columns]
         X = agg[features].values
-
         scaler = StandardScaler()
         Xs = scaler.fit_transform(X)
-
         km = KMeans(n_clusters=k, random_state=42, n_init=10)
         agg["cluster"] = km.fit_predict(Xs)
 
@@ -591,108 +446,49 @@ with tab4:
         y_axis = st.selectbox("Axe Y", options=features, index=features.index("ctr") if "ctr" in features else 1)
         size_axis = st.selectbox("Taille des points", options=features, index=features.index("impressions") if "impressions" in features else 0)
 
-    # ============================
-    # Graphique clustering PRO
-    # ============================
-        
         agg["cluster_label"] = agg["cluster"].astype(str)
         cluster_color_map = {str(i): c for i, c in enumerate(["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"])}
         fig = px.scatter(
-            agg,
-            x="roi",
-            y="revenue",
-            color="cluster_label",
-            size="revenue",
-            hover_name="campaign",
-            color_discrete_map=cluster_color_map,
-            labels={"cluster_label": "Cluster"},
-            size_max=40
+            agg, x="roi", y="revenue", color="cluster_label", size="revenue",
+            hover_name="campaign", color_discrete_map=cluster_color_map,
+            labels={"cluster_label": "Cluster"}, size_max=40
         )
-        
-        fig.update_layout(
-            height=600,
-            title="Segmentation des campagnes (ROI vs Revenue)",
-            legend_title="Cluster",
-            margin=dict(l=10, r=10, t=40, b=10)
-        )
-        
+        fig.update_layout(height=600, title="Segmentation des campagnes (ROI vs Revenue)", legend_title="Cluster", margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig, use_container_width=True)
-        
-        
-  # ============================
-  # Résumé clusters
-  # ============================
-        
+
         st.markdown("### 📊 Résumé clusters")
-        
         summary = (
             agg.groupby("cluster")
-            .agg({
-                "revenue": "mean",
-                "roi": "mean",
-                "clicks": "mean",
-                "impressions": "mean",
-                "campaign": "count"
-            })
+            .agg({"revenue": "mean", "roi": "mean", "clicks": "mean", "impressions": "mean", "campaign": "count"})
             .rename(columns={"campaign": "nb_campaigns"})
             .reset_index()
         )
-        
         st.dataframe(summary, use_container_width=True)
-        
-        
-   # ============================
-        # Commentaire automatique PORTFOLIO
-        # ============================
-        
-        st.markdown("### 🧠 Commentaire (portfolio)")
 
-        # Palette identique au graphique
+        st.markdown("### 🧠 Commentaire (portfolio)")
         PALETTE = ["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]
         EMOJI_DOT = ["🟣","🔵","🟠","🟢","🔴","🩵"]
 
         for _, row in summary.iterrows():
             cluster = int(row["cluster"])
             roi = row["roi"]
-            color = PALETTE[cluster % len(PALETTE)]
             dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
-
             if roi > 1:
-                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables → scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
+                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables - scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
             elif roi > 0:
-                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables → optimiser et développer. ROI moyen : **{roi*100:.1f}%**")
+                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables - optimiser et développer. ROI moyen : **{roi*100:.1f}%**")
             elif roi > -0.5:
-                st.warning(f"{dot} **Cluster {cluster}** : campagnes peu performantes → optimisation recommandée. ROI moyen : **{roi*100:.1f}%**")
+                st.warning(f"{dot} **Cluster {cluster}** : campagnes peu performantes - optimisation recommandée. ROI moyen : **{roi*100:.1f}%**")
             else:
-                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables → à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
-        
-        
-        # ============================
-        # Commentaire global portfolio
-        # ============================
-        
+                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables - à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
+
         best_cluster = summary.sort_values("roi", ascending=False).iloc[0]
         worst_cluster = summary.sort_values("roi").iloc[0]
-        
         st.markdown("---")
-        
         st.markdown("### 🎯 Analyse stratégique")
-        
-        st.write(
-            f"Le cluster le plus performant est le Cluster {best_cluster['cluster']} "
-            f"avec ROI moyen de {best_cluster['roi']*100:.1f}%."
-        )
-        
-        st.write(
-            f"Le cluster le moins performant est le Cluster {worst_cluster['cluster']} "
-            f"avec ROI moyen de {worst_cluster['roi']*100:.1f}%."
-        )
-        
-        st.write(
-            "Recommandation : réallouer le budget vers les clusters les plus performants "
-            "et optimiser ou arrêter les campagnes non rentables."
-        )  
-
+        st.write(f"Le cluster le plus performant est le Cluster {best_cluster['cluster']} avec ROI moyen de {best_cluster['roi']*100:.1f}%.")
+        st.write(f"Le cluster le moins performant est le Cluster {worst_cluster['cluster']} avec ROI moyen de {worst_cluster['roi']*100:.1f}%.")
+        st.write("Recommandation : réallouer le budget vers les clusters les plus performants et optimiser ou arrêter les campagnes non rentables.")
 
 # ============================================================
 # TAB 5 - AGENT AI
@@ -782,10 +578,9 @@ with tab5:
             )
             return {"rows": rows, "summary": f"Agrégation par {group_by}."}
 
-        # ── Simulate Budget Tool ──
         class _SB(_BM):
-            budget_increase_pct: float = _F(default=20.0, description="Pourcentage d'augmentation du budget (ex: 20 = +20%).")
-            category: str = _F(default="all", description="Catégorie à simuler (ex: social, search, influencer, all).")
+            budget_increase_pct: float = _F(default=20.0, description="Pourcentage augmentation budget (ex: 20 = +20%).")
+            category: str = _F(default="all", description="Categorie a simuler (ex: social, search, influencer, all).")
 
         @_tool("simulate_budget", args_schema=_SB)
         def _simulate(budget_increase_pct=20.0, category="all"):
@@ -793,7 +588,6 @@ with tab5:
             import numpy as _np
             from sklearn.ensemble import RandomForestRegressor as _RF
 
-            # Récupère les données d'entraînement
             where = f"WHERE category = '{category}'" if category != "all" else ""
             rows = _run_sql(f"""
                 SELECT mark_spent, clicks, impressions, ctr, cvr, leads, orders, revenue
@@ -809,23 +603,19 @@ with tab5:
             for c in df_cols:
                 df[c] = _pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-            features = ["mark_spent", "clicks", "impressions", "ctr", "cvr"]
-            features = [f for f in features if f in df.columns]
-            X = df[features].values
+            feats = ["mark_spent", "clicks", "impressions", "ctr", "cvr"]
+            feats = [f for f in feats if f in df.columns]
+            X = df[feats].values
             y = _np.log1p(df["revenue"].values)
-
             model = _RF(n_estimators=100, random_state=42)
             model.fit(X, y)
 
-            # Scénario actuel
-            X_base = df[features].copy()
+            X_base = df[feats].copy()
             rev_base = _np.expm1(model.predict(X_base.values)).sum()
-
-            # Scénario +budget
             X_sim = X_base.copy()
-            if "mark_spent" in features:
+            if "mark_spent" in feats:
                 X_sim["mark_spent"] = X_sim["mark_spent"] * (1 + budget_increase_pct / 100)
-            if "clicks" in features:
+            if "clicks" in feats:
                 X_sim["clicks"] = X_sim["clicks"] * (1 + budget_increase_pct / 100 * 0.7)
             rev_sim = _np.expm1(model.predict(X_sim.values)).sum()
 
@@ -843,9 +633,11 @@ with tab5:
                 "delta_pct": round(delta_pct, 2),
                 "roi_incremental": round(roi_sim, 4),
             }]
-            summary = (f"Simulation +{budget_increase_pct}% budget ({category}) : "
-                      f"revenue {rev_base:,.0f} → {rev_sim:,.0f} "
-                      f"(+{delta_pct:.1f}%, ROI incrémental : {roi_sim*100:.1f}%)")
+            summary = (
+                "Simulation +" + str(budget_increase_pct) + "% budget (" + category + ") : "
+                "revenue " + str(round(rev_base)) + " -> " + str(round(rev_sim)) +
+                " (+" + str(round(delta_pct, 1)) + "%, ROI incremental : " + str(round(roi_sim*100, 1)) + "%)"
+            )
             return {"rows": result_rows, "summary": summary}
 
         _TOOL_MAP = {t.name: t for t in [_underperforming, _rank, _agg, _simulate]}
@@ -864,7 +656,6 @@ with tab5:
                 _SM(content="Routeur marketing. Choisis : kpi_qa, diagnostic, segmentation, ou budget_simulation. Un seul mot. Choisis budget_simulation si la question parle de simulation, budget, augmentation, impact budget."),
                 _HM(content=state.user_question)
             ])
-            # ✅ CORRECTION
             state.intent = msg.content.strip() if msg.content.strip() in {"kpi_qa", "diagnostic", "segmentation", "budget_simulation"} else "kpi_qa"
             return state
 
@@ -876,26 +667,24 @@ with tab5:
                 "- aggregate_by_dimension(group_by)\n"
                 "- simulate_budget(budget_increase_pct, category)\n"
                 'Retourne UNIQUEMENT un JSON valide, ex: [{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":5}}]\n'
-                'Si la question compare deux plateformes, génère 2 tool calls séparés, un par plateforme.'
+                "Si la question compare deux plateformes, genere 2 tool calls separes, un par plateforme."
             )
-        
+
             try:
                 campaigns_list = dff["campaign"].dropna().unique().tolist()
             except Exception:
                 campaigns_list = []
-        
+
             msg = _llm.invoke([
                 _SM(content=system_prompt),
-                _HM(content=f"""Question: {state.user_question}
-        Intention: {state.intent}
-        Campagnes disponibles dans les données: {campaigns_list}
-        → Utilise UNIQUEMENT ces noms de campagnes exacts dans tes arguments.""")
-            ])   
-            
-            msg = _llm.invoke([
-                _SM(content=system_prompt),
-                _HM(content=f"Question: {state.user_question}\nIntention: {state.intent}")
+                _HM(content=(
+                    "Question: " + state.user_question + "\n"
+                    "Intention: " + str(state.intent) + "\n"
+                    "Campagnes disponibles dans les donnees: " + str(campaigns_list) + "\n"
+                    "Utilise UNIQUEMENT ces noms de campagnes exacts dans tes arguments."
+                ))
             ])
+
             try:
                 content = msg.content.strip().replace("```json", "").replace("```", "")
                 calls = _json.loads(content)
@@ -918,27 +707,28 @@ with tab5:
             ctx_parts = []
             for r in state.tool_results:
                 out = r["output"]
-                ctx_parts.append(f"TOOL: {r['tool']}\nSUMMARY: {out.get('summary','')}\nDATA:\n{_fmt(out.get('rows', []))}")
+                ctx_parts.append("TOOL: " + r["tool"] + "\nSUMMARY: " + out.get("summary","") + "\nDATA:\n" + _fmt(out.get("rows", [])))
             ctx = "\n\n".join(ctx_parts) if ctx_parts else "Aucun résultat."
-            msg = _llm.invoke([
-                # remplacez le _HM par :
-            _HM(content=f"""Question: {state.user_question}
-            
-            IMPORTANT: Réponds UNIQUEMENT par rapport aux campagnes explicitement mentionnées dans la question.
-            Si la question cite "facebook_retargeting" et "instagram", ne parle que de ces campagnes-là.
-            
-            Données disponibles:
-            {ctx}""")
 
-            RÈGLES DE FORMATAGE STRICTES :
-           "- Tous les montants monetaires : format CHF avec espaces (ex: CHF 3'098, CHF 42'889) - jamais de virgule decimale pour les montants"
-            "- Nombres entiers (clicks, impressions, leads) : separes par des espaces (ex: 2'999'919)"
-            "- ROI et CTR : en pourcentage avec 1 decimale (ex: ROI 307.0%, CTR 0.9%) - multiplier par 100 si necessaire"
-            "- ROAS : 1 decimale avec x (ex: ROAS 2.4x)"
-            "- Ne jamais afficher de decimales pour les montants (3098.45 -> CHF 3'098)"
-            Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."""),
-                            
-                _HM(content=f"Question: {state.user_question}\n\nDonnées:\n{ctx}")
+            system_content = (
+                "Assistant marketing analytique. Reponds en francais, oriente business.\n"
+                "REGLES DE FORMATAGE :\n"
+                "- Montants monetaires : format CHF avec espaces (ex: CHF 3098, CHF 42889)\n"
+                "- ROI et CTR : en pourcentage avec 1 decimale (ex: ROI 307.0%, CTR 0.9%)\n"
+                "- ROAS : 1 decimale avec x (ex: ROAS 2.4x)\n"
+                "Termine par 2-4 recommandations concretes. Ne cite que des chiffres presents dans les donnees."
+            )
+
+            user_content = (
+                "Question: " + state.user_question + "\n\n"
+                "IMPORTANT: Reponds UNIQUEMENT par rapport aux campagnes explicitement mentionnees dans la question.\n"
+                "Si la question cite une campagne precise, ne parle QUE de celle-la.\n\n"
+                "Donnees disponibles:\n" + ctx
+            )
+
+            msg = _llm.invoke([
+                _SM(content=system_content),
+                _HM(content=user_content)
             ])
             state.final_answer = msg.content
             return state
@@ -959,7 +749,6 @@ with tab5:
 
         AGENT_GRAPH = _build_graph()
 
-        # Exemples de questions
         st.markdown("**💡 Exemples de questions :**")
         examples = [
             "Top 5 campagnes par ROI",
@@ -993,9 +782,7 @@ with tab5:
                 except Exception as e:
                     st.error(f"Erreur agent : {e}")
 
-
-
-        # ============================================================
+# ============================================================
 # TAB 6 - FINE-TUNED AI
 # ============================================================
 with tab6:
@@ -1013,44 +800,49 @@ with tab6:
 
     if st.button("🚀 Generate Fine-tuned Recommendation"):
 
-        # Logique de recommandation locale (règles dérivées du modèle)
         if roi > 150:
-            perf, action, budget_advice, risk = (
-                "HIGH", "SCALE immediately",
-                f"Increase budget by 20-30%. Current ROI of {roi:.1f}% justifies aggressive scaling.",
-                f"Low risk - strong ROAS of {roas:.1f}x confirms sustainable performance."
-            )
+            perf = "HIGH"
+            action = "SCALE immediately"
+            budget_advice = "Increase budget by 20-30%. Current ROI of " + str(round(roi, 1)) + "% justifies aggressive scaling."
+            risk = "Low risk - strong ROAS of " + str(round(roas, 1)) + "x confirms sustainable performance."
         elif roi > 30:
-            perf, action, budget_advice, risk = (
-                "MEDIUM", "OPTIMIZE within 2 weeks",
-                f"Maintain current budget. Focus on CVR improvement.",
-                f"Medium risk - monitor weekly. CPL is acceptable but improvable."
-            )
+            perf = "MEDIUM"
+            action = "OPTIMIZE within 2 weeks"
+            budget_advice = "Maintain current budget. Focus on CVR improvement."
+            risk = "Medium risk - monitor weekly. CPL is acceptable but improvable."
         else:
-            perf, action, budget_advice, risk = (
-                "LOW", "REVIEW immediately",
-                f"Reduce budget by 30-50% or pause. ROI of {roi:.1f}% is below threshold.",
-                f"High risk - ROAS of {roas:.1f}x does not cover acquisition costs."
-            )
+            perf = "LOW"
+            action = "REVIEW immediately"
+            budget_advice = "Reduce budget by 30-50% or pause. ROI of " + str(round(roi, 1)) + "% is below threshold."
+            risk = "High risk - ROAS of " + str(round(roas, 1)) + "x does not cover acquisition costs."
 
-            roi_str = f"{roi:.1f}%"
-            roas_str = f"{roas:.1f}x"
-            ctr_str = f"{ctr_input:.2f}%"
-            
-            result = f"""Campaign Analysis - {channel.upper()} | {segment}
-            
-            Performance Level: {perf}
-            Key Metrics: ROI={roi_str}, ROAS={roas_str}, CTR={ctr_str}
+        roi_str = str(round(roi, 1)) + "%"
+        roas_str = str(round(roas, 1)) + "x"
+        ctr_str = str(round(ctr_input, 2)) + "%"
 
-Recommended Action: {action}
-Budget Strategy: {budget_advice}
-Risk Assessment: {risk}
+        if perf == "HIGH":
+            step1 = "Allocate additional budget to top-performing ad sets"
+            step2 = "Expand to similar audience segments"
+        elif perf == "MEDIUM":
+            step1 = "A/B test landing pages to improve CVR"
+            step2 = "Review audience segmentation"
+        else:
+            step1 = "Audit targeting and creative assets"
+            step2 = "Reallocate budget to high-ROI campaigns"
 
-Next Steps:
-1. {'Allocate additional budget to top-performing ad sets' if perf == 'HIGH' else 'A/B test landing pages to improve CVR' if perf == 'MEDIUM' else 'Audit targeting and creative assets'}
-2. {'Expand to similar audience segments' if perf == 'HIGH' else 'Review audience segmentation' if perf == 'MEDIUM' else 'Reallocate budget to high-ROI campaigns'}
-3. Track weekly KPI evolution and adjust accordingly."""
+        result = (
+            "Campaign Analysis - " + channel.upper() + " | " + segment + "\n\n"
+            "Performance Level: " + perf + "\n"
+            "Key Metrics: ROI=" + roi_str + ", ROAS=" + roas_str + ", CTR=" + ctr_str + "\n\n"
+            "Recommended Action: " + action + "\n"
+            "Budget Strategy: " + budget_advice + "\n"
+            "Risk Assessment: " + risk + "\n\n"
+            "Next Steps:\n"
+            "1. " + step1 + "\n"
+            "2. " + step2 + "\n"
+            "3. Track weekly KPI evolution and adjust accordingly."
+        )
 
         st.success("✅ Fine-tuned LLM Recommendation")
         st.code(result)
-        st.caption("Logic derived from TinyLlama 1.1B fine-tuned with LoRA · [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
+        st.caption("Logic derived from TinyLlama 1.1B fine-tuned with LoRA - [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
