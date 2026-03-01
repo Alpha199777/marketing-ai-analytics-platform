@@ -63,19 +63,19 @@ def format_num(x):
     try:
         return f"{int(round(float(x))):,}".replace(",", " ")
     except Exception:
-        return "—"
+        return "-"
 
 def format_money(x):
     try:
         return f"CHF {int(round(float(x))):,}".replace(",", " ")
     except Exception:
-        return "—"
+        return "-"
 
 def format_pct(x):
     try:
         return f"{float(x)*100:.1f}%"
     except Exception:
-        return "—"
+        return "-"
 
 def ensure_min_columns(df: pd.DataFrame):
     required = {"date", "campaign", "clicks", "impressions", "revenue"}
@@ -182,7 +182,7 @@ dff = df.loc[mask].copy()
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering", "🧠 Agent AI", "🧬 Fine-tuned AI"])
 
 # ============================================================
-# TAB 1 — DASHBOARD
+# TAB 1 - DASHBOARD
 # ============================================================
 with tab1:
     st.info("""
@@ -366,7 +366,7 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
             )
 
 # ============================================================
-# TAB 2 — ROI/ROAS
+# TAB 2 - ROI/ROAS
 # ============================================================
 with tab2:
     st.subheader("💰 ROI / ROAS")
@@ -381,8 +381,8 @@ with tab2:
 
         a, b, c = st.columns(3)
         a.metric("Spend total", format_money(spend_total))
-        b.metric("ROAS moyen", f"{roas_avg:.1f}x" if np.isfinite(roas_avg) else "—")
-        c.metric("ROI moyen", format_pct(roi_avg) if np.isfinite(roi_avg) else "—")
+        b.metric("ROAS moyen", f"{roas_avg:.1f}x" if np.isfinite(roas_avg) else "-")
+        c.metric("ROI moyen", format_pct(roi_avg) if np.isfinite(roi_avg) else "-")
 
         st.markdown(
             """
@@ -411,7 +411,7 @@ with tab2:
             st.dataframe(worst_roi, use_container_width=True, height=260)
 
 # ============================================================
-# TAB 3 — Prediction
+# TAB 3 - Prediction
 # ============================================================
 with tab3:
     st.subheader("🔮 Prédire le revenue (RandomForest)")
@@ -533,7 +533,7 @@ with tab3:
 
         a, b, c = st.columns(3)
         a.metric("R² (log space)", f"{r2:.3f}")
-        b.metric("MAPE (sur y>0)", format_pct(mape) if np.isfinite(mape) else "—")
+        b.metric("MAPE (sur y>0)", format_pct(mape) if np.isfinite(mape) else "-")
         c.metric("Features utilisées", ", ".join(features))
 
         st.divider()
@@ -552,7 +552,7 @@ with tab3:
         st.info("💡 Erreur élevée : utiliser les prédictions comme indication, pas comme valeur exacte. **démo** (meilleur avec +features: spend/leads/orders, et +données).")
 
 # ============================================================
-# TAB 4 — Clustering
+# TAB 4 - Clustering
 # ============================================================
 with tab4:
     st.subheader("🧩 Segmentation des campagnes (KMeans)")
@@ -695,11 +695,11 @@ with tab4:
 
 
 # ============================================================
-# TAB 5 — AGENT AI
+# TAB 5 - AGENT AI
 # ============================================================
 with tab5:
     st.subheader("🧠 Agent Autonome Marketing")
-    st.caption("Pose une question en langage naturel — l'agent interroge la base Databricks et répond.")
+    st.caption("Pose une question en langage naturel - l'agent interroge la base Databricks et répond.")
 
     missing_vars = [v for v in ["DATABRICKS_SERVER_HOSTNAME", "DATABRICKS_HTTP_PATH", "DATABRICKS_ACCESS_TOKEN", "OPENAI_API_KEY"] if not os.environ.get(v)]
 
@@ -996,10 +996,10 @@ with tab5:
 
 
         # ============================================================
-# TAB 6 — FINE-TUNED AI
+# TAB 6 - FINE-TUNED AI
 # ============================================================
 with tab6:
-    st.info("TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples — [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
+    st.info("TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples - [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -1018,19 +1018,19 @@ with tab6:
             perf, action, budget_advice, risk = (
                 "HIGH", "SCALE immediately",
                 f"Increase budget by 20-30%. Current ROI of {roi:.1f}% justifies aggressive scaling.",
-                f"Low risk — strong ROAS of {roas:.1f}x confirms sustainable performance."
+                f"Low risk - strong ROAS of {roas:.1f}x confirms sustainable performance."
             )
         elif roi > 30:
             perf, action, budget_advice, risk = (
                 "MEDIUM", "OPTIMIZE within 2 weeks",
                 f"Maintain current budget. Focus on CVR improvement.",
-                f"Medium risk — monitor weekly. CPL is acceptable but improvable."
+                f"Medium risk - monitor weekly. CPL is acceptable but improvable."
             )
         else:
             perf, action, budget_advice, risk = (
                 "LOW", "REVIEW immediately",
                 f"Reduce budget by 30-50% or pause. ROI of {roi:.1f}% is below threshold.",
-                f"High risk — ROAS of {roas:.1f}x does not cover acquisition costs."
+                f"High risk - ROAS of {roas:.1f}x does not cover acquisition costs."
             )
 
         result = f"""Campaign Analysis - {channel.upper()} | {segment}
