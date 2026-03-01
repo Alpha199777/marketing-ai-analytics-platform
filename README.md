@@ -66,6 +66,14 @@ Consumption Layer
     - LLM assistants (RAG on structured data)
     - Streamlit web app (5 tabs)
     - APIs and AI agents
+
+## 🔒 Security & Advanced AI Architecture
+
+This platform follows enterprise-grade security standards by decoupling the public interface from the proprietary AI logic:
+
+* **Private AI Submodule**: The core training pipelines and fine-tuning logic (LoRA on TinyLlama 1.1B) are hosted in a **secure private repository**. This protects intellectual property and specific training methodologies while keeping the application code open for demonstration.
+* **Modular Integration**: The system uses **Git Submodules** to link the secure backend to this public repository, ensuring a clean separation between the production environment and R&D scripts.
+* **Parameter-Efficient Fine-Tuning (PEFT)**: Implementation of **LoRA** (Low-Rank Adaptation) to achieve high-performance results with minimal resource consumption (reducing trainable parameters to ~0.10%).
 ```
 
 ---
