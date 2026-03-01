@@ -340,26 +340,74 @@ with tab3:
 ### 🎯 Objectif
 Ce modèle utilise le machine learning pour prédire le **revenue attendu d'une campagne marketing**.
 
-Il apprend la relation entre impressions, clicks, CTR, spend (si disponible) et le **revenue généré**.
+Il apprend la relation entre :
+
+• impressions
+• clicks
+• CTR
+• spend (si disponible)
+
+et le **revenue généré**.
 
 ---
 
 ### 📊 R² (coefficient de détermination)
-R² mesure la qualité globale du modèle.
-• R² = 1.0 : prédiction parfaite | • R² = 0.5 : modèle correct | • R² < 0 : modèle inutile
 
-Dans le marketing réel : 0.3-0.6 = bon | 0.6-0.8 = très bon | 0.8+ = excellent
+R² mesure la qualité globale du modèle.
+
+• R² = 1.0 → prédiction parfaite
+• R² = 0.5 → modèle correct
+• R² = 0 → modèle inutile
+• R² < 0 → modèle moins bon qu'une moyenne simple
+
+👉 Dans le marketing réel :
+
+• 0.3 – 0.6 = bon modèle
+• 0.6 – 0.8 = très bon modèle
+• 0.8+ = excellent modèle
 
 ---
 
 ### 📉 MAPE (%)
+
 MAPE = erreur moyenne en pourcentage.
-• < 10% : excellent | • 10-25% : bon | • 25-50% : acceptable | • > 50% : améliorable
+
+Exemple :
+
+MAPE = 20% → le modèle se trompe en moyenne de 20%
+
+Interprétation :
+
+• < 10% → excellent
+• 10–25% → bon
+• 25–50% → acceptable
+• > 50% → améliorable
+
+---
+
+### 🔄 Pourquoi utiliser log(revenue)
+
+Le revenue marketing est souvent très asymétrique :
+
+• Beaucoup de petites campagnes
+• Quelques très grosses campagnes
+
+Le log permet de :
+
+• stabiliser le modèle
+• éviter qu'une grosse campagne casse l'apprentissage
+• améliorer la précision globale
 
 ---
 
 ### 💼 Business value
-Simuler une campagne avant lancement, estimer le revenue attendu, optimiser le budget marketing.
+
+Ce modèle permet de :
+
+• simuler une campagne avant lancement
+• estimer le revenue attendu
+• optimiser le budget marketing
+• aider à la prise de décision
 """)
 
     features_candidates = ["impressions", "clicks", "ctr"]
