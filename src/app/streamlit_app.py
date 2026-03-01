@@ -931,11 +931,11 @@ with tab5:
             {ctx}""")
 
             RÈGLES DE FORMATAGE STRICTES :
-            - Tous les montants monétaires : format CHF avec espaces (ex: CHF 3'098, CHF 42'889) — jamais de virgule decimale pour les montants
-            - Nombres entiers (clicks, impressions, leads) : séparés par des espaces (ex: 2 999 919)
-            - ROI et CTR : en pourcentage avec 1 décimale (ex: ROI 307.0%, CTR 0.9%) — multiplier par 100 si nécessaire
-            - ROAS : 1 décimale avec x (ex: ROAS 2.4x)
-            - Ne jamais afficher de décimales pour les montants (3098.45 → CHF 3 098)
+           "- Tous les montants monetaires : format CHF avec espaces (ex: CHF 3'098, CHF 42'889) - jamais de virgule decimale pour les montants"
+            "- Nombres entiers (clicks, impressions, leads) : separes par des espaces (ex: 2'999'919)"
+            "- ROI et CTR : en pourcentage avec 1 decimale (ex: ROI 307.0%, CTR 0.9%) - multiplier par 100 si necessaire"
+            "- ROAS : 1 decimale avec x (ex: ROAS 2.4x)"
+            "- Ne jamais afficher de decimales pour les montants (3098.45 -> CHF 3'098)"
             Termine par 2-4 recommandations concrètes. Ne cite que des chiffres présents dans les données."""),
                             
                 _HM(content=f"Question: {state.user_question}\n\nDonnées:\n{ctx}")
