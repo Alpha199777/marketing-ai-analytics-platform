@@ -931,7 +931,7 @@ with tab5:
             {ctx}""")
 
             RÈGLES DE FORMATAGE STRICTES :
-            - Tous les montants monétaires : format CHF avec espaces (ex: CHF 3 098, CHF 42 889) — jamais de virgule décimale pour les montants
+            - Tous les montants monétaires : format CHF avec espaces (ex: CHF 3'098, CHF 42'889) — jamais de virgule decimale pour les montants
             - Nombres entiers (clicks, impressions, leads) : séparés par des espaces (ex: 2 999 919)
             - ROI et CTR : en pourcentage avec 1 décimale (ex: ROI 307.0%, CTR 0.9%) — multiplier par 100 si nécessaire
             - ROAS : 1 décimale avec x (ex: ROAS 2.4x)
