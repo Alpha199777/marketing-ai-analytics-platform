@@ -1033,10 +1033,14 @@ with tab6:
                 f"High risk - ROAS of {roas:.1f}x does not cover acquisition costs."
             )
 
-        result = f"""Campaign Analysis - {channel.upper()} | {segment}
-
-Performance Level: {perf}
-Key Metrics: ROI={roi:.1f}%, ROAS={roas:.1f}x, CTR={ctr_input:.2f}%
+            roi_str = f"{roi:.1f}%"
+            roas_str = f"{roas:.1f}x"
+            ctr_str = f"{ctr_input:.2f}%"
+            
+            result = f"""Campaign Analysis - {channel.upper()} | {segment}
+            
+            Performance Level: {perf}
+            Key Metrics: ROI={roi_str}, ROAS={roas_str}, CTR={ctr_str}
 
 Recommended Action: {action}
 Budget Strategy: {budget_advice}
