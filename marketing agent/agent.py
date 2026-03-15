@@ -223,9 +223,18 @@ Tools disponibles :
 - aggregate_by_dimension(group_by)                     → agrégation par category
 - simulate_budget(budget_increase_pct, category)       → simulation impact budget
 
-Choisis 1 à 2 tools maximum selon la question et l'intention.
-Retourne UNIQUEMENT un JSON valide, exemple :
-[{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":10}}]
+RÈGLES STRICTES :
+- Pour aggregate_by_dimension : group_by doit TOUJOURS être exactement la chaîne 'category'.
+  ❌ NE JAMAIS mettre un nom de campagne (ex: 'banner_partner', 'facebook_lal')
+  ❌ NE JAMAIS mettre autre chose que 'category'
+  ✅ Toujours : {{"tool":"aggregate_by_dimension","args":{{"group_by":"category"}}}}
+
+- Pour rank_campaigns : metric doit être l'un de : roi, revenue, ctr, cvr
+  ❌ NE JAMAIS mettre un nom de campagne comme metric
+
+- Choisis 1 à 2 tools maximum selon la question.
+- Retourne UNIQUEMENT un JSON valide, exemple :
+[{{"tool":"rank_campaigns","args":{{"metric":"roi","direction":"top","limit":10}}}}]
 """
 
 def plan_tools(state: AgentState) -> AgentState:
