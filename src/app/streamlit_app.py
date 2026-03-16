@@ -724,13 +724,13 @@ with tab5:
                 campaigns_list = []
 
             msg = _llm.invoke([
-                _SM(content=system_prompt),
-                _HM(content=(
-                    "Question: " + state.user_question + "\n"
-                    "Intention: " + str(state.intent) + "\n"
-                    "Campagnes disponibles dans les donnees: " + str(campaigns_list) + "\n"
-                    "Utilise UNIQUEMENT ces noms de campagnes exacts dans tes arguments."
-                ))
+               _HM(content=(
+                "Question: " + state.user_question + "\n"
+                "Intention: " + str(state.intent) + "\n"
+                "Campagnes disponibles (pour rank/underperforming UNIQUEMENT): " + str(campaigns_list) + "\n"
+                "IMPORTANT: Pour aggregate_by_dimension, group_by doit etre EXACTEMENT 'category'. "
+                "Ne jamais utiliser un nom de campagne comme valeur de group_by."
+            ))
             ])
 
             try:
