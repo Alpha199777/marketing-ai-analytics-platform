@@ -770,7 +770,7 @@ with tab5:
             user_content = (
                 "Question: " + state.user_question + "\n\n"
                 "IMPORTANT: Si les données contiennent plusieurs catégories ou campagnes, présente-les TOUTES.\n"
-                ""Ne résume pas à une seule ligne sauf si les données n'en contiennent qu'une.\n\n"
+                "Ne résume pas à une seule ligne sauf si les données n'en contiennent qu'une.\n\n"
                 "Donnees disponibles:\n" + ctx
             )
 
