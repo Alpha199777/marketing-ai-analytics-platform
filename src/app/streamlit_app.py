@@ -769,8 +769,8 @@ with tab5:
 
             user_content = (
                 "Question: " + state.user_question + "\n\n"
-                "IMPORTANT: Reponds UNIQUEMENT par rapport aux campagnes explicitement mentionnees dans la question.\n"
-                "Si la question cite une campagne precise, ne parle QUE de celle-la.\n\n"
+                "IMPORTANT: Si les données contiennent plusieurs catégories ou campagnes, présente-les TOUTES.\n"
+                ""Ne résume pas à une seule ligne sauf si les données n'en contiennent qu'une.\n\n"
                 "Donnees disponibles:\n" + ctx
             )
 
@@ -781,7 +781,7 @@ with tab5:
             state.final_answer = msg.content
             return state
 
-        @st.cache_resource
+       
         def _build_graph():
             g = _SG(_State)
             g.add_node("route", _route)
