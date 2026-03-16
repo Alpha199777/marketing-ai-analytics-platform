@@ -9,109 +9,70 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
-# ----------------------------
-# Page config
-# ----------------------------
-st.set_page_config(
-    page_title="Marketing AI Analytics Platform",
-    page_icon="📈",
-    layout="wide",
-)
+st.set_page_config(page_title="Marketing AI Analytics Platform", page_icon="📈", layout="wide")
 
-# ----------------------------
-# Helpers
-# ----------------------------
-def norm_cols(df: pd.DataFrame) -> pd.DataFrame:
-    df.columns = (
-        df.columns.astype(str)
-        .str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-    )
+def norm_cols(df):
+    df.columns = df.columns.astype(str).str.strip().str.lower().str.replace(" ", "_")
     return df
 
-def map_schema(df: pd.DataFrame) -> pd.DataFrame:
+def map_schema(df):
     df = norm_cols(df)
     df["campaign"] = df["campaign"].str.lower().str.strip()
-    rename_map = {
-        "c_date": "date",
-        "campaign_name": "campaign",
-        "mark_spent": "spend",
-    }
+    rename_map = {"c_date": "date", "campaign_name": "campaign", "mark_spent": "spend"}
     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
     return df
 
 @st.cache_data(ttl=300)
-def load_csv(path: str) -> pd.DataFrame:
+def load_csv(path):
     df = pd.read_csv(path)
     return map_schema(df)
 
 def safe_div(a, b):
-    a = np.array(a, dtype="float64")
-    b = np.array(b, dtype="float64")
-    out = np.full_like(a, np.nan, dtype="float64")
-    mask = b != 0
-    out[mask] = a[mask] / b[mask]
-    return out
+    a = np.array(a, dtype="float64"); b = np.array(b, dtype="float64")
+    out = np.full_like(a, np.nan, dtype="float64"); mask = b != 0
+    out[mask] = a[mask] / b[mask]; return out
 
 def format_num(x):
-    try:
-        return f"{int(round(float(x))):,}".replace(",", " ")
-    except Exception:
-        return "-"
+    try: return f"{int(round(float(x))):,}".replace(",", " ")
+    except: return "-"
 
 def format_money(x):
-    try:
-        return f"CHF {int(round(float(x))):,}".replace(",", " ")
-    except Exception:
-        return "-"
+    try: return f"CHF {int(round(float(x))):,}".replace(",", " ")
+    except: return "-"
 
 def format_pct(x):
-    try:
-        return f"{float(x)*100:.1f}%"
-    except Exception:
-        return "-"
+    try: return f"{float(x)*100:.1f}%"
+    except: return "-"
 
-def ensure_min_columns(df: pd.DataFrame):
+def ensure_min_columns(df):
     required = {"date", "campaign", "clicks", "impressions", "revenue"}
     missing = required - set(df.columns)
     if missing:
         st.error(f"Colonnes manquantes: {sorted(list(missing))}\n\nColonnes dispo: {list(df.columns)}")
         st.stop()
 
-def compute_metrics(df: pd.DataFrame) -> pd.DataFrame:
+def compute_metrics(df):
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df = df.dropna(subset=["date"]).copy()
-
     for c in ["clicks", "impressions", "revenue"]:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
     if "spend" in df.columns:
         df["spend"] = pd.to_numeric(df["spend"], errors="coerce").fillna(0)
     if "leads" in df.columns:
         df["leads"] = pd.to_numeric(df["leads"], errors="coerce").fillna(0)
     if "orders" in df.columns:
         df["orders"] = pd.to_numeric(df["orders"], errors="coerce").fillna(0)
-
     df["ctr"] = safe_div(df["clicks"], df["impressions"])
     df["rev_per_click"] = safe_div(df["revenue"], df["clicks"])
     df["rev_per_1k_impr"] = safe_div(df["revenue"] * 1000, df["impressions"])
-
     if "spend" in df.columns:
         df["roas"] = safe_div(df["revenue"], df["spend"])
         df["roi"] = safe_div(df["revenue"] - df["spend"], df["spend"])
-
     return df
 
-# ----------------------------
-# Header
-# ----------------------------
 st.title("Marketing AI Analytics Platform")
 st.caption("📊 KPI • ROI/ROAS • Prediction • Clustering (portfolio pro)")
 
-# ----------------------------
-# Sidebar
-# ----------------------------
 with st.sidebar:
     st.header("⚙️ Paramètres")
     data_mode = st.radio("Source de données", ["CSV du repo (recommandé)", "Uploader un CSV"], index=0)
@@ -123,30 +84,21 @@ with st.sidebar:
     show_table = st.checkbox("Afficher la table détaillée", value=True)
     top_n = st.slider("Top campagnes (table + bar)", 5, 50, 15)
 
-# ----------------------------
-# Load
-# ----------------------------
 if data_mode == "CSV du repo (recommandé)":
     df = load_csv("data/sample_marketing.csv")
 else:
     if uploaded_file is None:
-        st.info("Upload un CSV pour continuer.")
-        st.stop()
+        st.info("Upload un CSV pour continuer."); st.stop()
     df = map_schema(pd.read_csv(uploaded_file))
 
 ensure_min_columns(df)
 df = compute_metrics(df)
 
-# ----------------------------
-# Filters
-# ----------------------------
 campaigns = sorted(df["campaign"].dropna().astype(str).unique().tolist())
-min_date = df["date"].min().date()
-max_date = df["date"].max().date()
+min_date = df["date"].min().date(); max_date = df["date"].max().date()
 
 with st.sidebar:
-    st.divider()
-    st.subheader("🔎 Filtres")
+    st.divider(); st.subheader("🔎 Filtres")
     selected_campaigns = st.multiselect("Campagnes", options=campaigns, default=campaigns)
     date_range = st.date_input("Période", value=(min_date, max_date), min_value=min_date, max_value=max_date)
 
@@ -162,14 +114,9 @@ mask = (
 )
 dff = df.loc[mask].copy()
 
-# ----------------------------
-# Tabs
-# ----------------------------
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering", "🧠 Agent AI", "🧬 Fine-tuned AI"])
 
-# ============================================================
 # TAB 1 - DASHBOARD
-# ============================================================
 with tab1:
     st.info("""
 Ce dashboard permet d'analyser la performance des campagnes marketing :
@@ -186,7 +133,14 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
     rpc_avg = np.nanmean(dff["rev_per_click"]) if len(dff) else np.nan
     rpm_avg = np.nanmean(dff["rev_per_1k_impr"]) if len(dff) else np.nan
 
+    # FIX 1: KPI metrics OUTSIDE the expander
     k1, k2, k3, k4, k5, k6 = st.columns(6)
+    k1.metric("Revenue total", format_money(total_revenue))
+    k2.metric("Clicks", format_num(total_clicks))
+    k3.metric("Impressions", format_num(total_impr))
+    k4.metric("CTR moyen", format_pct(ctr_avg))
+    k5.metric("CHF / Click (moy.)", format_money(rpc_avg))
+    k6.metric("CHF / 1k Impr (moy.)", format_money(rpm_avg))
 
     with st.expander("📖 Comprendre les indicateurs (KPI)"):
         col1, col2 = st.columns(2)
@@ -203,19 +157,13 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
             st.markdown("""
 ### 💶 CHF / Click (moyen)
 **Définition :** Revenue / Clicks  
-**Ce que ça mesure :** combien chaque click rapporte en moyenne.  
-**Interprétation :**  
-• élevé → traffic de qualité  
-• faible → trafic peu qualifié
+**Ce que ça mesure :** combien chaque click rapporte en moyenne.
 """)
         with col2:
             st.markdown("""
 ### 👁️ CHF / 1k Impressions (RPM)
 **Définition :** Revenue / Impressions x 1000  
-**Ce que ça mesure :** revenu généré pour 1 000 vues.  
-**Interprétation :**  
-• élevé → campagne efficace  
-• faible → mauvaise conversion
+**Ce que ça mesure :** revenu généré pour 1 000 vues.
 """)
             st.markdown("""
 ### 📈 Revenue total
@@ -225,76 +173,61 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
             st.markdown("""
 ### 🖱️ Clicks & 👁️ Impressions
 **Impressions :** nombre de fois où la campagne est affichée  
-**Clicks :** nombre de clics générés  
-Ensemble, ils mesurent la performance marketing.
+**Clicks :** nombre de clics générés
 """)
 
-        k1.metric("Revenue total", format_money(total_revenue))
-        k2.metric("Clicks", format_num(total_clicks))
-        k3.metric("Impressions", format_num(total_impr))
-        k4.metric("CTR moyen", format_pct(ctr_avg))
-        k5.metric("CHF / Click (moy.)", format_money(rpc_avg))
-        k6.metric("CHF / 1k Impr (moy.)", format_money(rpm_avg))
+    st.divider()
 
-        st.divider()
+    # FIX 1 cont.: Charts OUTSIDE the expander
+    left, right = st.columns([1.35, 1])
 
-        left, right = st.columns([1.35, 1])
+    with left:
+        st.subheader("📈 Tendance (au choix)")
+        ts = (
+            dff.groupby(pd.Grouper(key="date", freq="D"))
+            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
+            .reset_index().sort_values("date")
+        )
+        ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
+        metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
+        if ts.empty:
+            st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
+        else:
+            fig = px.line(ts, x="date", y=metric, markers=True)
+            fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
+            st.plotly_chart(fig, use_container_width=True)
 
-        with left:
-            st.subheader("📈 Tendance (au choix)")
-            ts = (
-                dff.groupby(pd.Grouper(key="date", freq="D"))
-                .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
-                .reset_index()
-                .sort_values("date")
-            )
-            ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
-            metric = st.selectbox("Métrique", ["revenue", "clicks", "impressions", "ctr"], index=0)
-            if ts.empty:
-                st.warning("Aucune donnée à afficher pour cette période / ces campagnes.")
-            else:
-                fig = px.line(ts, x="date", y=metric, markers=True)
-                fig.update_layout(height=360, margin=dict(l=10, r=10, t=30, b=10))
-                st.plotly_chart(fig, use_container_width=True)
+    with right:
+        st.subheader("🏆 Top campagnes (table + bar)")
+        by_campaign = (
+            dff.groupby("campaign", as_index=False)
+            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
+        )
+        by_campaign["ctr"] = safe_div(by_campaign["clicks"], by_campaign["impressions"])
+        by_campaign["rev_per_click"] = safe_div(by_campaign["revenue"], by_campaign["clicks"])
+        sort_by = st.selectbox("Trier par", ["revenue", "clicks", "impressions", "ctr", "rev_per_click"], index=0)
+        top = by_campaign.sort_values(sort_by, ascending=False).head(top_n).copy()
+        st.dataframe(top.rename(columns={"rev_per_click": "CHF/click"}), use_container_width=True, height=220)
+        fig2 = px.bar(top, x="campaign", y=sort_by)
+        fig2.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10))
+        st.plotly_chart(fig2, use_container_width=True)
 
-        with right:
-            st.subheader("🏆 Top campagnes (table + bar)")
-            by_campaign = (
-                dff.groupby("campaign", as_index=False)
-                .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
-            )
-            by_campaign["ctr"] = safe_div(by_campaign["clicks"], by_campaign["impressions"])
-            by_campaign["rev_per_click"] = safe_div(by_campaign["revenue"], by_campaign["clicks"])
-            sort_by = st.selectbox("Trier par", ["revenue", "clicks", "impressions", "ctr", "rev_per_click"], index=0)
-            top = by_campaign.sort_values(sort_by, ascending=False).head(top_n).copy()
-            st.dataframe(top.rename(columns={"rev_per_click": "CHF/click"}), use_container_width=True, height=220)
-            fig2 = px.bar(top, x="campaign", y=sort_by)
-            fig2.update_layout(height=320, margin=dict(l=10, r=10, t=30, b=10))
-            st.plotly_chart(fig2, use_container_width=True)
+    st.divider()
 
-        st.divider()
+    if show_table:
+        st.subheader("📄 Données filtrées")
+        cols = ["date", "campaign", "clicks", "impressions", "revenue", "ctr", "rev_per_click", "rev_per_1k_impr"]
+        extra = [c for c in ["spend", "roi", "roas", "leads", "orders"] if c in dff.columns]
+        cols = cols + extra
+        table = dff[cols].sort_values("date", ascending=False)
+        st.dataframe(table, use_container_width=True, height=420)
+        st.download_button("⬇️ Télécharger les données filtrées (CSV)", data=table.to_csv(index=False).encode("utf-8"), file_name="marketing_filtered.csv", mime="text/csv")
 
-        if show_table:
-            st.subheader("📄 Données filtrées")
-            cols = ["date", "campaign", "clicks", "impressions", "revenue", "ctr", "rev_per_click", "rev_per_1k_impr"]
-            extra = [c for c in ["spend", "roi", "roas", "leads", "orders"] if c in dff.columns]
-            cols = cols + extra
-            table = dff[cols].sort_values("date", ascending=False)
-            st.dataframe(table, use_container_width=True, height=420)
-            st.download_button(
-                "⬇️ Télécharger les données filtrées (CSV)",
-                data=table.to_csv(index=False).encode("utf-8"),
-                file_name="marketing_filtered.csv",
-                mime="text/csv"
-            )
-
-# ============================================================
 # TAB 2 - ROI/ROAS
-# ============================================================
 with tab2:
     st.subheader("💰 ROI / ROAS")
     if "spend" not in dff.columns:
-        st.warning("Aucune colonne de coût/spend détectée (ex: `spend` ou `mark_spent`). ROI/ROAS indisponibles.")
+        st.warning("Aucune colonne de coût/spend détectée. ROI/ROAS indisponibles.")
         st.info("👉 Ajoute `mark_spent` dans ton CSV (ou renomme en `spend`) pour activer cette page.")
     else:
         spend_total = dff["spend"].sum()
@@ -323,16 +256,12 @@ with tab2:
         left, right = st.columns(2)
         with left:
             st.markdown("### ✅ Top ROAS")
-            top_roas = by_campaign.sort_values("roas", ascending=False).head(10)
-            st.dataframe(top_roas, use_container_width=True, height=260)
+            st.dataframe(by_campaign.sort_values("roas", ascending=False).head(10), use_container_width=True, height=260)
         with right:
             st.markdown("### ⚠️ Worst ROI")
-            worst_roi = by_campaign.sort_values("roi", ascending=True).head(10)
-            st.dataframe(worst_roi, use_container_width=True, height=260)
+            st.dataframe(by_campaign.sort_values("roi", ascending=True).head(10), use_container_width=True, height=260)
 
-# ============================================================
 # TAB 3 - Prediction
-# ============================================================
 with tab3:
     st.subheader("🔮 Prédire le revenue (RandomForest)")
     with st.expander("ℹ️ Comprendre les métriques de prédiction (R², MAPE, log)"):
@@ -340,83 +269,28 @@ with tab3:
 ### 🎯 Objectif
 Ce modèle utilise le machine learning pour prédire le **revenue attendu d'une campagne marketing**.
 
-Il apprend la relation entre :
-
-• impressions
-• clicks
-• CTR
-• spend (si disponible)
-
-et le **revenue généré**.
-
 ---
 
 ### 📊 R² (coefficient de détermination)
+• R² = 1.0 → prédiction parfaite | R² = 0 → modèle inutile | R² < 0 → moins bon qu'une moyenne
 
-R² mesure la qualité globale du modèle.
-
-• R² = 1.0 → prédiction parfaite
-• R² = 0.5 → modèle correct
-• R² = 0 → modèle inutile
-• R² < 0 → modèle moins bon qu'une moyenne simple
-
-👉 Dans le marketing réel :
-
-• 0.3 – 0.6 = bon modèle
-• 0.6 – 0.8 = très bon modèle
-• 0.8+ = excellent modèle
+Dans le marketing réel : 0.3–0.6 = bon | 0.6–0.8 = très bon | 0.8+ = excellent
 
 ---
 
 ### 📉 MAPE (%)
-
-MAPE = erreur moyenne en pourcentage.
-
-Exemple :
-
-MAPE = 20% → le modèle se trompe en moyenne de 20%
-
-Interprétation :
-
-• < 10% → excellent
-• 10–25% → bon
-• 25–50% → acceptable
-• > 50% → améliorable
+MAPE = erreur moyenne en pourcentage. < 10% excellent | 10–25% bon | > 50% améliorable
 
 ---
 
 ### 🔄 Pourquoi utiliser log(revenue)
-
-Le revenue marketing est souvent très asymétrique :
-
-• Beaucoup de petites campagnes
-• Quelques très grosses campagnes
-
-Le log permet de :
-
-• stabiliser le modèle
-• éviter qu'une grosse campagne casse l'apprentissage
-• améliorer la précision globale
-
----
-
-### 💼 Business value
-
-Ce modèle permet de :
-
-• simuler une campagne avant lancement
-• estimer le revenue attendu
-• optimiser le budget marketing
-• aider à la prise de décision
+Le revenue marketing est souvent très asymétrique. Le log stabilise le modèle et évite qu'une grosse campagne casse l'apprentissage.
 """)
 
     features_candidates = ["impressions", "clicks", "ctr"]
-    if "spend" in dff.columns:
-        features_candidates.append("spend")
-    if "leads" in dff.columns:
-        features_candidates.append("leads")
-    if "orders" in dff.columns:
-        features_candidates.append("orders")
+    if "spend" in dff.columns: features_candidates.append("spend")
+    if "leads" in dff.columns: features_candidates.append("leads")
+    if "orders" in dff.columns: features_candidates.append("orders")
 
     st.caption(f"Features possibles: {', '.join(features_candidates)}")
     features = st.multiselect("Features utilisées", options=features_candidates, default=features_candidates[:3])
@@ -434,8 +308,7 @@ Ce modèle permet de :
         pred = np.expm1(pred_log)
         y_true = np.expm1(y_test)
         r2 = model.score(X_test, y_test)
-        y_true_np = np.array(y_true, dtype="float64")
-        pred_np = np.array(pred, dtype="float64")
+        y_true_np = np.array(y_true, dtype="float64"); pred_np = np.array(pred, dtype="float64")
         mask = y_true_np > 0
         mape = np.mean(np.abs((y_true_np[mask] - pred_np[mask]) / y_true_np[mask])) if mask.any() else np.nan
 
@@ -446,27 +319,24 @@ Ce modèle permet de :
 
         st.divider()
         st.markdown("### ✍️ Simuler une campagne")
-        cols = st.columns(len(features))
+        cols_ui = st.columns(len(features))
         user_vals = {}
         for i, f in enumerate(features):
-            with cols[i]:
+            with cols_ui[i]:
                 default_val = float(np.nanmedian(dff[f])) if np.isfinite(np.nanmedian(dff[f])) else 0.0
                 user_vals[f] = st.number_input(f, value=float(default_val), step=1.0)
 
         sim = pd.DataFrame([user_vals])
         pred_sim = np.expm1(model.predict(sim)[0])
         st.success(f"📈 Revenue prédit : **{format_money(pred_sim)}**")
-        st.info("💡 Erreur élevée : utiliser les prédictions comme indication, pas comme valeur exacte. **démo** (meilleur avec +features: spend/leads/orders, et +données).")
+        st.info("💡 Utiliser les prédictions comme indication. **démo** (meilleur avec +features et +données).")
 
-# ============================================================
 # TAB 4 - Clustering
-# ============================================================
 with tab4:
     st.subheader("🧩 Segmentation des campagnes (KMeans)")
 
     grp_cols = ["revenue", "clicks", "impressions", "ctr"]
-    if "spend" in dff.columns:
-        grp_cols += ["spend", "roas", "roi"]
+    if "spend" in dff.columns: grp_cols += ["spend", "roas", "roi"]
 
     agg = (
         dff.groupby("campaign", as_index=False)
@@ -477,49 +347,54 @@ with tab4:
         st.warning("Pas assez de campagnes distinctes pour clusteriser (il faut au moins ~6).")
     else:
         k = st.slider("Nombre de clusters (k)", 2, 6, 4)
-        features = [c for c in grp_cols if c in agg.columns]
-        X = agg[features].values
+        features_clust = [c for c in grp_cols if c in agg.columns]
+        X = agg[features_clust].values
         scaler = StandardScaler()
         Xs = scaler.fit_transform(X)
         km = KMeans(n_clusters=k, random_state=42, n_init=10)
         agg["cluster"] = km.fit_predict(Xs)
 
         st.markdown("### 📌 Résumé clusters")
-        summary = agg.groupby("cluster", as_index=False).agg({c: "mean" for c in features} | {"campaign": "count"})
+        summary = agg.groupby("cluster", as_index=False).agg({c: "mean" for c in features_clust} | {"campaign": "count"})
         summary = summary.rename(columns={"campaign": "n_campaigns"})
         st.dataframe(summary, use_container_width=True, height=220)
 
         st.markdown("### 🎨 Visualisation (couleur + taille)")
-        x_axis = st.selectbox("Axe X", options=features, index=features.index("revenue") if "revenue" in features else 0)
-        y_axis = st.selectbox("Axe Y", options=features, index=features.index("ctr") if "ctr" in features else 1)
-        size_axis = st.selectbox("Taille des points", options=features, index=features.index("impressions") if "impressions" in features else 0)
+        x_axis = st.selectbox("Axe X", options=features_clust, index=features_clust.index("revenue") if "revenue" in features_clust else 0)
+        y_axis = st.selectbox("Axe Y", options=features_clust, index=features_clust.index("ctr") if "ctr" in features_clust else 1)
+        size_axis = st.selectbox("Taille des points", options=features_clust, index=features_clust.index("impressions") if "impressions" in features_clust else 0)
 
         agg["cluster_label"] = agg["cluster"].astype(str)
         cluster_color_map = {str(i): c for i, c in enumerate(["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"])}
+
+        # FIX 2: use x_axis, y_axis, size_axis instead of hardcoded "roi", "revenue", "revenue"
         fig = px.scatter(
-            agg, x="roi", y="revenue", color="cluster_label", size="revenue",
+            agg, x=x_axis, y=y_axis, color="cluster_label", size=size_axis,
             hover_name="campaign", color_discrete_map=cluster_color_map,
             labels={"cluster_label": "Cluster"}, size_max=40
         )
-        fig.update_layout(height=600, title="Segmentation des campagnes (ROI vs Revenue)", legend_title="Cluster", margin=dict(l=10, r=10, t=40, b=10))
+        fig.update_layout(height=600, title=f"Segmentation des campagnes ({x_axis} vs {y_axis})", legend_title="Cluster", margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("### 📊 Résumé clusters")
-        summary = (
+        summary2_cols = {"revenue": "mean", "clicks": "mean", "impressions": "mean", "campaign": "count"}
+        if "roi" in agg.columns: summary2_cols["roi"] = "mean"
+        summary2 = (
             agg.groupby("cluster")
-            .agg({"revenue": "mean", "roi": "mean", "clicks": "mean", "impressions": "mean", "campaign": "count"})
+            .agg(summary2_cols)
             .rename(columns={"campaign": "nb_campaigns"})
             .reset_index()
         )
-        st.dataframe(summary, use_container_width=True)
+        st.dataframe(summary2, use_container_width=True)
 
         st.markdown("### 🧠 Commentaire (portfolio)")
         PALETTE = ["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]
         EMOJI_DOT = ["🟣","🔵","🟠","🟢","🔴","🩵"]
 
-        for _, row in summary.iterrows():
+        roi_col = "roi" if "roi" in summary2.columns else "revenue"
+        for _, row in summary2.iterrows():
             cluster = int(row["cluster"])
-            roi = row["roi"]
+            roi = row[roi_col]
             dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
             if roi > 1:
                 st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables - scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
@@ -530,17 +405,15 @@ with tab4:
             else:
                 st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables - à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
 
-        best_cluster = summary.sort_values("roi", ascending=False).iloc[0]
-        worst_cluster = summary.sort_values("roi").iloc[0]
+        best_cluster = summary2.sort_values(roi_col, ascending=False).iloc[0]
+        worst_cluster = summary2.sort_values(roi_col).iloc[0]
         st.markdown("---")
         st.markdown("### 🎯 Analyse stratégique")
-        st.write(f"Le cluster le plus performant est le Cluster {best_cluster['cluster']} avec ROI moyen de {best_cluster['roi']*100:.1f}%.")
-        st.write(f"Le cluster le moins performant est le Cluster {worst_cluster['cluster']} avec ROI moyen de {worst_cluster['roi']*100:.1f}%.")
+        st.write(f"Le cluster le plus performant est le Cluster {int(best_cluster['cluster'])} avec ROI moyen de {best_cluster[roi_col]*100:.1f}%.")
+        st.write(f"Le cluster le moins performant est le Cluster {int(worst_cluster['cluster'])} avec ROI moyen de {worst_cluster[roi_col]*100:.1f}%.")
         st.write("Recommandation : réallouer le budget vers les clusters les plus performants et optimiser ou arrêter les campagnes non rentables.")
 
-# ============================================================
 # TAB 5 - AGENT AI
-# ============================================================
 with tab5:
     st.subheader("🧠 Agent Autonome Marketing")
     st.caption("Pose une question en langage naturel - l'agent interroge la base Databricks et répond.")
@@ -577,8 +450,7 @@ with tab5:
                     return [dict(zip(cols, r)) for r in cur.fetchmany(max_rows)]
 
         def _fmt(rows, n=8):
-            if not rows:
-                return "Aucun résultat."
+            if not rows: return "Aucun résultat."
             keys = list(rows[0].keys())
             lines = [" | ".join(keys), "-" * 80]
             for r in rows[:n]:
@@ -723,14 +595,16 @@ with tab5:
             except Exception:
                 campaigns_list = []
 
+            # FIX 3: system_prompt was defined but never passed — added _SM(content=system_prompt)
             msg = _llm.invoke([
-               _HM(content=(
-                "Question: " + state.user_question + "\n"
-                "Intention: " + str(state.intent) + "\n"
-                "Campagnes disponibles (pour rank/underperforming UNIQUEMENT): " + str(campaigns_list) + "\n"
-                "IMPORTANT: Pour aggregate_by_dimension, group_by doit etre EXACTEMENT 'category'. "
-                "Ne jamais utiliser un nom de campagne comme valeur de group_by."
-            ))
+                _SM(content=system_prompt),
+                _HM(content=(
+                    "Question: " + state.user_question + "\n"
+                    "Intention: " + str(state.intent) + "\n"
+                    "Campagnes disponibles (pour rank/underperforming UNIQUEMENT): " + str(campaigns_list) + "\n"
+                    "IMPORTANT: Pour aggregate_by_dimension, group_by doit etre EXACTEMENT 'category'. "
+                    "Ne jamais utiliser un nom de campagne comme valeur de group_by."
+                ))
             ])
 
             try:
@@ -781,7 +655,6 @@ with tab5:
             state.final_answer = msg.content
             return state
 
-       
         def _build_graph():
             g = _SG(_State)
             g.add_node("route", _route)
@@ -798,12 +671,7 @@ with tab5:
         AGENT_GRAPH = _build_graph()
 
         st.markdown("**💡 Exemples de questions :**")
-        examples = [
-            "Top 5 campagnes par ROI",
-            "Campagnes sous-performantes (ROI < 0)",
-            "Analyse par catégorie",
-            "Simule +20% budget sur social",
-        ]
+        examples = ["Top 5 campagnes par ROI", "Campagnes sous-performantes (ROI < 0)", "Analyse par catégorie", "Simule +20% budget sur social"]
         ex_cols = st.columns(4)
         for i, ex in enumerate(examples):
             with ex_cols[i]:
@@ -830,9 +698,7 @@ with tab5:
                 except Exception as e:
                     st.error(f"Erreur agent : {e}")
 
-# ============================================================
 # TAB 6 - FINE-TUNED AI
-# ============================================================
 with tab6:
     st.info("TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples - [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
 
@@ -847,36 +713,27 @@ with tab6:
         ctr_input = st.number_input("CTR (%)", min_value=0.1, max_value=20.0, value=2.5, step=0.1)
 
     if st.button("🚀 Generate Fine-tuned Recommendation"):
-
         if roi > 150:
-            perf = "HIGH"
-            action = "SCALE immediately"
+            perf = "HIGH"; action = "SCALE immediately"
             budget_advice = "Increase budget by 20-30%. Current ROI of " + str(round(roi, 1)) + "% justifies aggressive scaling."
             risk = "Low risk - strong ROAS of " + str(round(roas, 1)) + "x confirms sustainable performance."
         elif roi > 30:
-            perf = "MEDIUM"
-            action = "OPTIMIZE within 2 weeks"
+            perf = "MEDIUM"; action = "OPTIMIZE within 2 weeks"
             budget_advice = "Maintain current budget. Focus on CVR improvement."
             risk = "Medium risk - monitor weekly. CPL is acceptable but improvable."
         else:
-            perf = "LOW"
-            action = "REVIEW immediately"
+            perf = "LOW"; action = "REVIEW immediately"
             budget_advice = "Reduce budget by 30-50% or pause. ROI of " + str(round(roi, 1)) + "% is below threshold."
             risk = "High risk - ROAS of " + str(round(roas, 1)) + "x does not cover acquisition costs."
 
-        roi_str = str(round(roi, 1)) + "%"
-        roas_str = str(round(roas, 1)) + "x"
-        ctr_str = str(round(ctr_input, 2)) + "%"
+        roi_str = str(round(roi, 1)) + "%"; roas_str = str(round(roas, 1)) + "x"; ctr_str = str(round(ctr_input, 2)) + "%"
 
         if perf == "HIGH":
-            step1 = "Allocate additional budget to top-performing ad sets"
-            step2 = "Expand to similar audience segments"
+            step1 = "Allocate additional budget to top-performing ad sets"; step2 = "Expand to similar audience segments"
         elif perf == "MEDIUM":
-            step1 = "A/B test landing pages to improve CVR"
-            step2 = "Review audience segmentation"
+            step1 = "A/B test landing pages to improve CVR"; step2 = "Review audience segmentation"
         else:
-            step1 = "Audit targeting and creative assets"
-            step2 = "Reallocate budget to high-ROI campaigns"
+            step1 = "Audit targeting and creative assets"; step2 = "Reallocate budget to high-ROI campaigns"
 
         result = (
             "Campaign Analysis - " + channel.upper() + " | " + segment + "\n\n"
