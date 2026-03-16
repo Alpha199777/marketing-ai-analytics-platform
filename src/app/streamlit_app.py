@@ -207,7 +207,7 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
         st.subheader("📈 Tendance (au choix)")
         ts = (
             dff.groupby(pd.Grouper(key="date", freq="D"))
-            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"))
+            .agg(revenue=("revenue", "sum"), clicks=("clicks", "sum"), impressions=("impressions", "sum"), spend=("spend", "sum"))
             .reset_index().sort_values("date")
         )
         ts["ctr"] = (ts["clicks"] / ts["impressions"]).replace([np.inf, -np.inf], np.nan).fillna(0)
