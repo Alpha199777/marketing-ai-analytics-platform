@@ -86,13 +86,20 @@ def rank_campaigns(metric: str, direction: str = "top", limit: int = 10) -> Dict
 
 
 class AggParams(BaseModel):
-    group_by: Literal["category"] = Field(description="Dimension d'agrégation (ex: category).")
+    group_by: Literal[
+        "category",       # par canal (social, search, influencer, media)
+        "campaign_name",  # par nom de campagne
+        "campaign_id",    # par ID de campagne
+        "c_date",         # par date (évolution temporelle)
+    ] = Field(description="Dimension d'agrégation.")
+
 
 @tool("aggregate_by_dimension", args_schema=AggParams)
 def aggregate_by_dimension(group_by: str = "category") -> Dict[str, Any]:
-    """Agrège les KPI par catégorie (social, search, etc.)."""
-    if group_by not in {"category"}:
-        raise ValueError("Dimension non autorisée.")
+    """Agrège les KPI par catégorie (category, campaign_name, campaign_id, c_date)."""
+     allowed = {"category", "campaign_name", "campaign_id", "c_date"}
+    if group_by not in allowed:
+        raise ValueError(f"Dimension non autorisée. Valeurs acceptées : {allowed}")
     query = f"""
         SELECT
             {group_by},
@@ -101,7 +108,10 @@ def aggregate_by_dimension(group_by: str = "category") -> Dict[str, Any]:
             ROUND(SUM(revenue), 2) as total_revenue,
             ROUND(AVG(roi), 4) as avg_roi,
             ROUND(AVG(ctr), 4) as avg_ctr,
-            ROUND(AVG(cvr), 4) as avg_cvr
+            ROUND(AVG(cvr), 4) as avg_cvr,
+            ROUND(SUM(clicks), 0) as total_clicks,
+            ROUND(SUM(leads), 0) as total_leads,
+            ROUND(SUM(orders), 0) as total_orders
         FROM marketing_kpi
         GROUP BY {group_by}
         ORDER BY total_revenue DESC
@@ -218,13 +228,33 @@ def route_intent(state: AgentState) -> AgentState:
 
 PLANNER_SYSTEM = """Tu es un planner pour un assistant marketing.
 Tools disponibles :
-- get_underperforming_campaigns(roi_threshold, limit)  → campagnes sous-performantes
-- rank_campaigns(metric, direction, limit)             → top/bottom par métrique (roi, revenue, ctr, cvr)
-- aggregate_by_dimension(group_by)                     → agrégation par category
-- simulate_budget(budget_increase_pct, category)       → simulation impact budget
+- get_underperforming_campaigns(roi_threshold, limit)
+    → campagnes avec ROI inférieur au seuil
 
+- rank_campaigns(metric, direction, limit)
+    → top/bottom campagnes par métrique
+    → metric accepte UNIQUEMENT : roi, revenue, ctr, cvr
+    → direction accepte UNIQUEMENT : top, bottom
+
+- aggregate_by_dimension(group_by)
+    → agrégation des KPI par dimension
+    → group_by accepte UNIQUEMENT ces 4 valeurs :
+        * 'category'      → analyser par canal (social, search, influencer, media)
+        * 'campaign_name' → analyser par nom de campagne
+        * 'campaign_id'   → analyser par ID de campagne
+        * 'c_date'        → analyser l'évolution dans le temps
+    ❌ JAMAIS mettre un nom de campagne comme valeur de group_by
+    ✅ Exemple correct : {{"tool":"aggregate_by_dimension","args":{{"group_by":"category"}}}}
+    ✅ Exemple correct : {{"tool":"aggregate_by_dimension","args":{{"group_by":"campaign_name"}}}}
+
+- simulate_budget(budget_increase_pct, category)
+    → simulation de l'impact d'une augmentation de budget
+    → category accepte : social, search, influencer, media, all
+
+RÈGLES :
 - Choisis 1 à 2 tools maximum selon la question.
-- Retourne UNIQUEMENT un JSON valide, exemple :
+- Retourne UNIQUEMENT un JSON valide.
+- Exemple :
 [{{"tool":"rank_campaigns","args":{{"metric":"roi","direction":"top","limit":10}}}}]
 """
 
