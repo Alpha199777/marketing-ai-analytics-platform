@@ -407,23 +407,13 @@ with tab4:
         fig.update_layout(height=600, title=f"Segmentation des campagnes ({x_axis} vs {y_axis})", legend_title="Cluster", margin=dict(l=10, r=10, t=40, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
-        st.markdown("### 📊 Résumé clusters")
-        summary2_cols = {"revenue": "mean", "clicks": "mean", "impressions": "mean", "campaign": "count"}
-        if "roi" in agg.columns: summary2_cols["roi"] = "mean"
-        summary2 = (
-            agg.groupby("cluster")
-            .agg(summary2_cols)
-            .rename(columns={"campaign": "nb_campaigns"})
-            .reset_index()
-        )
-        st.dataframe(summary2, use_container_width=True)
-
+        # Pas de second "Résumé clusters" — on réutilise summary déjà affiché en haut
         st.markdown("### 🧠 Commentaire (portfolio)")
         PALETTE = ["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]
         EMOJI_DOT = ["🟣","🔵","🟠","🟢","🔴","🩵"]
 
-        roi_col = "roi" if "roi" in summary2.columns else "revenue"
-        for _, row in summary2.iterrows():
+        roi_col = "roi" if "roi" in summary.columns else "revenue"
+        for _, row in summary.iterrows():
             cluster = int(row["cluster"])
             roi = row[roi_col]
             dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
@@ -440,8 +430,8 @@ with tab4:
                 # ROI < -50% → non rentable
                 st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables — à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
 
-        best_cluster = summary2.sort_values(roi_col, ascending=False).iloc[0]
-        worst_cluster = summary2.sort_values(roi_col).iloc[0]
+        best_cluster = summary.sort_values(roi_col, ascending=False).iloc[0]
+        worst_cluster = summary.sort_values(roi_col).iloc[0]
         st.markdown("---")
         st.markdown("### 🎯 Analyse stratégique")
         st.write(f"Le cluster le plus performant est le Cluster {int(best_cluster['cluster'])} avec ROI moyen de {best_cluster[roi_col]*100:.1f}%.")
