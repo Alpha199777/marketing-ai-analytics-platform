@@ -10,9 +10,6 @@ from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
 
 
-# ─────────────────────────────────────────
-# 1) CONNEXION DATABRICKS SQL WAREHOUSE
-# ─────────────────────────────────────────
 def run_sql(query: str, params: tuple = (), max_rows: int = 200) -> List[Dict[str, Any]]:
     hostname  = os.environ["DATABRICKS_SERVER_HOSTNAME"]
     http_path = os.environ["DATABRICKS_HTTP_PATH"]
@@ -41,10 +38,6 @@ def format_rows(rows: List[Dict[str, Any]], max_items: int = 10) -> str:
         lines.append(f"... ({len(rows) - max_items} lignes supplémentaires)")
     return "\n".join(lines)
 
-
-# ─────────────────────────────────────────
-# 2) TOOLS (actions disponibles pour l'agent)
-# ─────────────────────────────────────────
 
 class UnderperformingParams(BaseModel):
     roi_threshold: float = Field(default=0.0, description="Seuil ROI en dessous duquel une campagne est sous-performante.")
@@ -87,17 +80,18 @@ def rank_campaigns(metric: str, direction: str = "top", limit: int = 10) -> Dict
 
 class AggParams(BaseModel):
     group_by: Literal[
-        "category",       # par canal (social, search, influencer, media)
-        "campaign_name",  # par nom de campagne
-        "campaign_id",    # par ID de campagne
-        "c_date",         # par date (évolution temporelle)
+        "category",
+        "campaign_name",
+        "campaign_id",
+        "c_date",
     ] = Field(description="Dimension d'agrégation.")
 
 
 @tool("aggregate_by_dimension", args_schema=AggParams)
 def aggregate_by_dimension(group_by: str = "category") -> Dict[str, Any]:
     """Agrège les KPI par catégorie (category, campaign_name, campaign_id, c_date)."""
-     allowed = {"category", "campaign_name", "campaign_id", "c_date"}
+    # FIX 1: indentation error — leading space removed
+    allowed = {"category", "campaign_name", "campaign_id", "c_date"}
     if group_by not in allowed:
         raise ValueError(f"Dimension non autorisée. Valeurs acceptées : {allowed}")
     query = f"""
@@ -184,9 +178,6 @@ TOOLS = [get_underperforming_campaigns, rank_campaigns, aggregate_by_dimension, 
 TOOL_MAP = {t.name: t for t in TOOLS}
 
 
-# ─────────────────────────────────────────
-# 3) ETAT DE L'AGENT
-# ─────────────────────────────────────────
 class AgentState(BaseModel):
     user_question: str
     intent: Optional[str] = None
@@ -195,15 +186,9 @@ class AgentState(BaseModel):
     final_answer: Optional[str] = None
 
 
-# ─────────────────────────────────────────
-# 4) LLM
-# ─────────────────────────────────────────
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
 
 
-# ─────────────────────────────────────────
-# 5) NOEUDS DU GRAPHE
-# ─────────────────────────────────────────
 ROUTER_SYSTEM = """Tu es un routeur pour un assistant marketing analytique.
 Choisis UNE intention parmi :
 - kpi_qa       : question descriptive, ranking, top/bottom campagnes
@@ -220,7 +205,8 @@ def route_intent(state: AgentState) -> AgentState:
         HumanMessage(content=state.user_question)
     ])
     intent = msg.content.strip()
-    if intent not in {"kpi_qa", "diagnostic", "segmentation"}:
+    # FIX 2: budget_simulation was missing from the valid set → always fell back to kpi_qa
+    if intent not in {"kpi_qa", "diagnostic", "segmentation", "budget_simulation"}:
         intent = "kpi_qa"
     state.intent = intent
     return state
@@ -229,30 +215,17 @@ def route_intent(state: AgentState) -> AgentState:
 PLANNER_SYSTEM = """Tu es un planner pour un assistant marketing.
 Tools disponibles :
 - get_underperforming_campaigns(roi_threshold, limit)
-    → campagnes avec ROI inférieur au seuil
-
 - rank_campaigns(metric, direction, limit)
-    → top/bottom campagnes par métrique
-    → metric accepte UNIQUEMENT : roi, revenue, ctr, cvr
-    → direction accepte UNIQUEMENT : top, bottom
-
+    → metric : roi, revenue, ctr, cvr uniquement
+    → direction : top, bottom uniquement
 - aggregate_by_dimension(group_by)
-    → agrégation des KPI par dimension
-    → group_by accepte UNIQUEMENT ces 4 valeurs :
-        * 'category'      → analyser par canal (social, search, influencer, media)
-        * 'campaign_name' → analyser par nom de campagne
-        * 'campaign_id'   → analyser par ID de campagne
-        * 'c_date'        → analyser l'évolution dans le temps
+    → group_by : category, campaign_name, campaign_id, c_date uniquement
     ❌ JAMAIS mettre un nom de campagne comme valeur de group_by
-    ✅ Exemple correct : {{"tool":"aggregate_by_dimension","args":{{"group_by":"category"}}}}
-    ✅ Exemple correct : {{"tool":"aggregate_by_dimension","args":{{"group_by":"campaign_name"}}}}
-
 - simulate_budget(budget_increase_pct, category)
-    → simulation de l'impact d'une augmentation de budget
-    → category accepte : social, search, influencer, media, all
+    → category : social, search, influencer, media, all
 
 RÈGLES :
-- Choisis 1 à 2 tools maximum selon la question.
+- Choisis 1 à 2 tools maximum.
 - Retourne UNIQUEMENT un JSON valide.
 - Exemple :
 [{{"tool":"rank_campaigns","args":{{"metric":"roi","direction":"top","limit":10}}}}]
@@ -316,9 +289,6 @@ def compose_answer(state: AgentState) -> AgentState:
     return state
 
 
-# ─────────────────────────────────────────
-# 6) CONSTRUCTION DU GRAPHE LANGGRAPH
-# ─────────────────────────────────────────
 def build_graph():
     g = StateGraph(AgentState)
     g.add_node("route_intent",   route_intent)
@@ -336,18 +306,12 @@ def build_graph():
 GRAPH = build_graph()
 
 
-# ─────────────────────────────────────────
-# 7) FONCTION PRINCIPALE
-# ─────────────────────────────────────────
 def ask_agent(question: str) -> str:
     state = AgentState(user_question=question)
     out = GRAPH.invoke(state)
     return out["final_answer"]
 
 
-# ─────────────────────────────────────────
-# TEST RAPIDE (lance : python agent.py)
-# ─────────────────────────────────────────
 if __name__ == "__main__":
     question = "Quelles sont les 5 campagnes avec le meilleur ROI ?"
     print(f"\n❓ Question : {question}\n")
