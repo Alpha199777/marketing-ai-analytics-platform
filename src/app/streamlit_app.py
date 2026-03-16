@@ -9,8 +9,14 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
+# ----------------------------
+# Page config
+# ----------------------------
 st.set_page_config(page_title="Marketing AI Analytics Platform", page_icon="📈", layout="wide")
 
+# ----------------------------
+# Helpers
+# ----------------------------
 def norm_cols(df):
     df.columns = df.columns.astype(str).str.strip().str.lower().str.replace(" ", "_")
     return df
@@ -70,11 +76,16 @@ def compute_metrics(df):
         df["roi"] = safe_div(df["revenue"] - df["spend"], df["spend"])
     return df
 
+# ----------------------------
+# Header
+# ----------------------------
 st.title("Marketing AI Analytics Platform")
 st.caption("📊 KPI • ROI/ROAS • Prediction • Clustering (portfolio pro)")
 
+# ----------------------------
+# Sidebar
+# ----------------------------
 with st.sidebar:
-    st.header("⚙️ Paramètres")
     data_mode = st.radio("Source de données", ["CSV du repo (recommandé)", "Uploader un CSV"], index=0)
     uploaded_file = None
     if data_mode == "Uploader un CSV":
@@ -84,6 +95,9 @@ with st.sidebar:
     show_table = st.checkbox("Afficher la table détaillée", value=True)
     top_n = st.slider("Top campagnes (table + bar)", 5, 50, 15)
 
+# ----------------------------
+# Load
+# ----------------------------
 if data_mode == "CSV du repo (recommandé)":
     df = load_csv("data/sample_marketing.csv")
 else:
@@ -94,6 +108,9 @@ else:
 ensure_min_columns(df)
 df = compute_metrics(df)
 
+# ----------------------------
+# Filters
+# ----------------------------
 campaigns = sorted(df["campaign"].dropna().astype(str).unique().tolist())
 min_date = df["date"].min().date(); max_date = df["date"].max().date()
 
@@ -114,9 +131,14 @@ mask = (
 )
 dff = df.loc[mask].copy()
 
+# ----------------------------
+# Tabs
+# ----------------------------
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📌 Dashboard", "💰 ROI/ROAS", "🔮 Prediction", "🧩 Clustering", "🧠 Agent AI", "🧬 Fine-tuned AI"])
 
+# ============================================================
 # TAB 1 - DASHBOARD
+# ============================================================
 with tab1:
     st.info("""
 Ce dashboard permet d'analyser la performance des campagnes marketing :
@@ -223,7 +245,9 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
         st.dataframe(table, use_container_width=True, height=420)
         st.download_button("⬇️ Télécharger les données filtrées (CSV)", data=table.to_csv(index=False).encode("utf-8"), file_name="marketing_filtered.csv", mime="text/csv")
 
+# ============================================================
 # TAB 2 - ROI/ROAS
+# ============================================================
 with tab2:
     st.subheader("💰 ROI / ROAS")
     if "spend" not in dff.columns:
@@ -261,7 +285,9 @@ with tab2:
             st.markdown("### ⚠️ Worst ROI")
             st.dataframe(by_campaign.sort_values("roi", ascending=True).head(10), use_container_width=True, height=260)
 
+# ============================================================
 # TAB 3 - Prediction
+# ============================================================
 with tab3:
     st.subheader("🔮 Prédire le revenue (RandomForest)")
     with st.expander("ℹ️ Comprendre les métriques de prédiction (R², MAPE, log)"):
@@ -331,12 +357,17 @@ Le revenue marketing est souvent très asymétrique. Le log stabilise le modèle
         st.success(f"📈 Revenue prédit : **{format_money(pred_sim)}**")
         st.info("💡 Utiliser les prédictions comme indication. **démo** (meilleur avec +features et +données).")
 
+# ============================================================
 # TAB 4 - Clustering
+# ============================================================
 with tab4:
     st.subheader("🧩 Segmentation des campagnes (KMeans)")
 
-    grp_cols = ["revenue", "clicks", "impressions", "ctr"]
-    if "spend" in dff.columns: grp_cols += ["spend", "roas", "roi"]
+    # Whitelist strict : seules ces colonnes sont autorisées dans le clustering
+    # Évite que des colonnes inattendues du CSV (ex: "Roas", "King"...) n'apparaissent dans les dropdowns
+    KNOWN_CLUSTER_METRICS = ["revenue", "clicks", "impressions", "ctr", "spend", "roas", "roi"]
+
+    grp_cols = [c for c in KNOWN_CLUSTER_METRICS if c in dff.columns]
 
     agg = (
         dff.groupby("campaign", as_index=False)
@@ -347,7 +378,7 @@ with tab4:
         st.warning("Pas assez de campagnes distinctes pour clusteriser (il faut au moins ~6).")
     else:
         k = st.slider("Nombre de clusters (k)", 2, 6, 4)
-        features_clust = [c for c in grp_cols if c in agg.columns]
+        features_clust = [c for c in KNOWN_CLUSTER_METRICS if c in agg.columns]
         X = agg[features_clust].values
         scaler = StandardScaler()
         Xs = scaler.fit_transform(X)
@@ -397,13 +428,17 @@ with tab4:
             roi = row[roi_col]
             dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
             if roi > 1:
-                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables - scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
+                # ROI > 100% → très rentable
+                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables — scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
             elif roi > 0:
-                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables - optimiser et développer. ROI moyen : **{roi*100:.1f}%**")
+                # ROI entre 0 et 100% → rentable (PAS "underperforming" — c'était contradictoire)
+                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables — optimiser et développer. ROI moyen : **{roi*100:.1f}%**")
             elif roi > -0.5:
-                st.warning(f"{dot} **Cluster {cluster}** : campagnes peu performantes - optimisation recommandée. ROI moyen : **{roi*100:.1f}%**")
+                # ROI entre -50% et 0% → sous-performant
+                st.warning(f"{dot} **Cluster {cluster}** : campagnes sous-performantes — optimisation recommandée. ROI moyen : **{roi*100:.1f}%**")
             else:
-                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables - à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
+                # ROI < -50% → non rentable
+                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables — à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
 
         best_cluster = summary2.sort_values(roi_col, ascending=False).iloc[0]
         worst_cluster = summary2.sort_values(roi_col).iloc[0]
@@ -413,7 +448,9 @@ with tab4:
         st.write(f"Le cluster le moins performant est le Cluster {int(worst_cluster['cluster'])} avec ROI moyen de {worst_cluster[roi_col]*100:.1f}%.")
         st.write("Recommandation : réallouer le budget vers les clusters les plus performants et optimiser ou arrêter les campagnes non rentables.")
 
+# ============================================================
 # TAB 5 - AGENT AI
+# ============================================================
 with tab5:
     st.subheader("🧠 Agent Autonome Marketing")
     st.caption("Pose une question en langage naturel - l'agent interroge la base Databricks et répond.")
@@ -698,7 +735,9 @@ with tab5:
                 except Exception as e:
                     st.error(f"Erreur agent : {e}")
 
+# ============================================================
 # TAB 6 - FINE-TUNED AI
+# ============================================================
 with tab6:
     st.info("TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples - [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
 
