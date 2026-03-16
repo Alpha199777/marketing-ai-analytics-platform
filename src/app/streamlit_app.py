@@ -712,7 +712,7 @@ with tab5:
                 "Planner marketing. Tools disponibles:\n"
                 "- get_underperforming_campaigns(roi_threshold, limit)\n"
                 "- rank_campaigns(metric, direction, limit)\n"
-                "- aggregate_by_dimension(group_by) — group_by doit etre EXACTEMENT 'category', jamais un nom de campagne\n"
+                "- aggregate_by_dimension(group_by)\n"
                 "- simulate_budget(budget_increase_pct, category)\n"
                 'Retourne UNIQUEMENT un JSON valide, ex: [{"tool":"rank_campaigns","args":{"metric":"roi","direction":"top","limit":5}}]\n'
                 "Si la question compare deux plateformes, genere 2 tool calls separes, un par plateforme."
