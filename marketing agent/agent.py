@@ -49,9 +49,9 @@ def get_underperforming_campaigns(roi_threshold: float = 0.0, limit: int = 10) -
     query = """
         SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi, ctr, cvr, cpl
         FROM marketing_kpi
-        WHERE roi < ?
+        WHERE roi < %s
         ORDER BY roi ASC
-        LIMIT ?
+        LIMIT %s
     """
     rows = run_sql(query, (roi_threshold, limit))
     return {"rows": rows, "summary": f"{len(rows)} campagnes sous-performantes (ROI < {roi_threshold})."}
@@ -72,7 +72,7 @@ def rank_campaigns(metric: str, direction: str = "top", limit: int = 10) -> Dict
         SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi, ctr, cvr, cpl
         FROM marketing_kpi
         ORDER BY {metric} {order}
-        LIMIT ?
+        LIMIT %s
     """
     rows = run_sql(query, (limit,))
     return {"rows": rows, "summary": f"{direction} {limit} campagnes par {metric}."}
