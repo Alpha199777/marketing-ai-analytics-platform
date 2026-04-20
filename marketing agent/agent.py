@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, ENDget
 
 
 def run_sql(query: str, params: tuple = (), max_rows: int = 200) -> List[Dict[str, Any]]:
@@ -49,11 +49,11 @@ def get_underperforming_campaigns(roi_threshold: float = 0.0, limit: int = 10) -
     query = """
         SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi, ctr, cvr, cpl
         FROM marketing_kpi
-        WHERE roi < %s
+        WHERE roi < {roi_threshold}
         ORDER BY roi ASC
-        LIMIT %s
+        LIMIT {limit}
     """
-    rows = run_sql(query, (roi_threshold, limit))
+    rows = run_sql(query)
     return {"rows": rows, "summary": f"{len(rows)} campagnes sous-performantes (ROI < {roi_threshold})."}
 
 
@@ -72,9 +72,9 @@ def rank_campaigns(metric: str, direction: str = "top", limit: int = 10) -> Dict
         SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi, ctr, cvr, cpl
         FROM marketing_kpi
         ORDER BY {metric} {order}
-        LIMIT %s
+        LIMIT {limit}
     """
-    rows = run_sql(query, (limit,))
+    rows = run_sql(query)
     return {"rows": rows, "summary": f"{direction} {limit} campagnes par {metric}."}
 
 
