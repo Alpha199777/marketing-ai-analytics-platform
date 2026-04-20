@@ -494,7 +494,7 @@ with tab5:
         def _underperforming(roi_threshold=0.0, limit=10):
             """Campagnes avec ROI sous le seuil."""
             rows = _run_sql(
-                "SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi WHERE roi < ? ORDER BY roi ASC LIMIT ?",
+                "SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi WHERE roi < %s ORDER BY roi ASC LIMIT %s",
                 (roi_threshold, limit)
             )
             return {"rows": rows, "summary": f"{len(rows)} campagnes sous-performantes (ROI < {roi_threshold})."}
@@ -509,7 +509,7 @@ with tab5:
             """Classe les campagnes par métrique."""
             order = "DESC" if direction == "top" else "ASC"
             rows = _run_sql(
-                f"SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi ORDER BY {metric} {order} LIMIT ?",
+                f"SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi ORDER BY {metric} {order} LIMIT %s",
                 (limit,)
             )
             return {"rows": rows, "summary": f"{direction} {limit} par {metric}."}
