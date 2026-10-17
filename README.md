@@ -119,14 +119,14 @@ This table acts as the structured knowledge base for analytics and AI.
 
 ### Revenue models — evaluated honestly
 
-Figures from `marketing_kpi` (308 rows, 11 campaigns), PySpark MLlib, **5-fold cross-validation**.
+Figures from `marketing_kpi` (308 rows, 11 campaigns), PySpark MLlib on Databricks serverless, **5-fold cross-validation** (screenshot: `screenshots/comparaison_modeles_cv.png`).
 
 | Model | R² | Median error |
 |---|---|---|
-| RandomForest **with** `roi` (first version) | 0.84 | 21 % |
-| RandomForest without `roi` | 0.81 | 26 % |
+| RandomForest **with** `roi` (first version) | 0.82 | 21 % |
+| RandomForest without `roi` | 0.77 | 26 % |
 | Baseline: orders × average basket | **0.88** | 27 % |
-| RandomForest without `roi`, unseen campaigns | 0.57 | 44 % |
+| RandomForest without `roi`, unseen campaigns | 0.60 | 46 % |
 | Baseline, unseen campaigns | **0.84** | 34 % |
 
 What this shows:
@@ -393,6 +393,7 @@ Includes:
 ### Screenshots (/screenshots)
 
 * kpi_table.PNG — KPI metrics layer
+* comparaison_modeles_cv.png — Cross-validated comparison: RandomForest with / without `roi` vs the orders × average basket baseline
 * importances_regression.png — Feature importances of the explanatory RandomForest and reading of the cross-validated results (Databricks run)
 * simulation_budget_canal_cv.png — Pre-launch simulation model (budget + channel): cross-validated R², median error, empirical range
 * simulation_par_canal.png — Forecast revenue, range and ROI per channel and budget
