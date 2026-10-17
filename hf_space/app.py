@@ -28,7 +28,9 @@ SEGMENTS = ["B2B", "B2C", "Premium", "Mass Market"]
 
 tokenizer = AutoTokenizer.from_pretrained(ADAPTER)
 base = AutoModelForCausalLM.from_pretrained(BASE_MODEL, dtype=torch.float32)
-model = PeftModel.from_pretrained(base, ADAPTER).merge_and_unload()  # fusion : inférence plus rapide
+# Chargement forcé sur CPU : sur ZeroGPU, aucun GPU n'existe au démarrage (il n'est alloué que pendant
+# l'appel de recommend) ; sans torch_device, PEFT tente de charger l'adaptateur sur CUDA et plante.
+model = PeftModel.from_pretrained(base, ADAPTER, torch_device="cpu").merge_and_unload()  # fusion : inférence plus rapide
 model.eval()
 
 
