@@ -11,6 +11,8 @@ from sklearn.metrics import r2_score, silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
+from budget_simulation import simulate_budget_increase, SQL_QUERY as SIM_SQL_QUERY
+
 # ----------------------------
 # Page config
 # ----------------------------
@@ -623,66 +625,15 @@ with tab5:
             return {"rows": rows, "summary": f"Agrégation par {group_by}."}
 
         class _SB(_BM):
-            budget_increase_pct: float = _F(default=20.0, description="Pourcentage augmentation budget (ex: 20 = +20%).")
-            category: str = _F(default="all", description="Categorie a simuler (ex: social, search, influencer, all).")
+            budget_increase_pct: float = _F(default=20.0, description="Variation du budget en % (ex: 20 = +20%, -30 = -30%).")
+            category: str = _F(default="all", description="Canal : all, social, search, influencer ou media.")
 
         @_tool("simulate_budget", args_schema=_SB)
         def _simulate(budget_increase_pct=20.0, category="all"):
-            """Simule l'impact d'une augmentation de budget sur le revenue via RandomForest."""
-            import numpy as _np
-            from sklearn.ensemble import RandomForestRegressor as _RF
-
-            where = f"WHERE category = '{category}'" if category != "all" else ""
-            rows = _run_sql(f"""
-                SELECT mark_spent, clicks, impressions, ctr, cvr, leads, orders, revenue
-                FROM marketing_kpi {where}
-                ORDER BY revenue DESC LIMIT 500
-            """)
-            if len(rows) < 10:
-                return {"summary": "Pas assez de données pour simuler.", "rows": []}
-
-            df_cols = list(rows[0].keys())
-            import pandas as _pd
-            df = _pd.DataFrame(rows, columns=df_cols)
-            for c in df_cols:
-                df[c] = _pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-            feats = ["mark_spent", "clicks", "impressions", "ctr", "cvr"]
-            feats = [f for f in feats if f in df.columns]
-            X = df[feats].values
-            y = _np.log1p(df["revenue"].values)
-            model = _RF(n_estimators=100, random_state=42)
-            model.fit(X, y)
-
-            X_base = df[feats].copy()
-            rev_base = _np.expm1(model.predict(X_base.values)).sum()
-            X_sim = X_base.copy()
-            if "mark_spent" in feats:
-                X_sim["mark_spent"] = X_sim["mark_spent"] * (1 + budget_increase_pct / 100)
-            if "clicks" in feats:
-                X_sim["clicks"] = X_sim["clicks"] * (1 + budget_increase_pct / 100 * 0.7)
-            rev_sim = _np.expm1(model.predict(X_sim.values)).sum()
-
-            delta = rev_sim - rev_base
-            delta_pct = (delta / rev_base * 100) if rev_base > 0 else 0
-            roi_sim = delta / (df["mark_spent"].sum() * budget_increase_pct / 100) if df["mark_spent"].sum() > 0 else 0
-
-            result_rows = [{
-                "categorie": category,
-                "budget_actuel": round(df["mark_spent"].sum(), 2),
-                "budget_simule": round(df["mark_spent"].sum() * (1 + budget_increase_pct/100), 2),
-                "revenue_actuel": round(rev_base, 2),
-                "revenue_simule": round(rev_sim, 2),
-                "delta_revenue": round(delta, 2),
-                "delta_pct": round(delta_pct, 2),
-                "roi_incremental": round(roi_sim, 4),
-            }]
-            summary = (
-                "Simulation +" + str(budget_increase_pct) + "% budget (" + category + ") : "
-                "revenue " + str(round(rev_base)) + " -> " + str(round(rev_sim)) +
-                " (+" + str(round(delta_pct, 1)) + "%, ROI incremental : " + str(round(roi_sim*100, 1)) + "%)"
-            )
-            return {"rows": result_rows, "summary": summary}
+            """Simule l'impact d'une variation de budget sur le revenue (modèle budget + canal, voir budget_simulation.py)."""
+            # Requête fixe, sans paramètre utilisateur : la catégorie est validée dans simulate_budget_increase
+            rows = _run_sql(SIM_SQL_QUERY, max_rows=100000)
+            return simulate_budget_increase(pd.DataFrame(rows), budget_increase_pct, category)
 
         _TOOL_MAP = {t.name: t for t in [_underperforming, _rank, _agg, _simulate]}
 
@@ -826,7 +777,22 @@ with tab5:
 # TAB 6 - FINE-TUNED AI
 # ============================================================
 with tab6:
-    st.info("TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples - [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
+    st.info(
+        "**Model:** TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples - "
+        "[Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)\n\n"
+        "**This live demo does not run the model.** The base model (~2 GB) is too heavy for free hosting, "
+        "so the recommendation below comes from **business rules** that mirror the model's output format."
+    )
+    with st.expander("▶️ Run the real fine-tuned model locally"):
+        st.code(
+            "pip install transformers peft torch\n\n"
+            "from peft import PeftModel\n"
+            "from transformers import AutoTokenizer, AutoModelForCausalLM\n\n"
+            "tokenizer = AutoTokenizer.from_pretrained(\"Doers97/marketing-lora-tinyllama\")\n"
+            "base = AutoModelForCausalLM.from_pretrained(\"TinyLlama/TinyLlama-1.1B-Chat-v1.0\")\n"
+            "model = PeftModel.from_pretrained(base, \"Doers97/marketing-lora-tinyllama\")",
+            language="python",
+        )
 
     col1, col2 = st.columns(2)
     with col1:
@@ -838,7 +804,7 @@ with tab6:
         roas = st.number_input("ROAS", min_value=0.1, max_value=10.0, value=1.5, step=0.1)
         ctr_input = st.number_input("CTR (%)", min_value=0.1, max_value=20.0, value=2.5, step=0.1)
 
-    if st.button("🚀 Generate Fine-tuned Recommendation"):
+    if st.button("🚀 Generate Recommendation (rule-based)"):
         if roi > 150:
             perf = "HIGH"; action = "SCALE immediately"
             budget_advice = "Increase budget by 20-30%. Current ROI of " + str(round(roi, 1)) + "% justifies aggressive scaling."
@@ -874,6 +840,6 @@ with tab6:
             "3. Track weekly KPI evolution and adjust accordingly."
         )
 
-        st.success("✅ Fine-tuned LLM Recommendation")
+        st.success("✅ Rule-based recommendation (same output format as the fine-tuned model)")
         st.code(result)
-        st.caption("Logic derived from TinyLlama 1.1B fine-tuned with LoRA - [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)")
+        st.caption("Thresholds: ROI > 150 % → scale, 30–150 % → optimize, < 30 % → review. Generated by rules, not by the LLM.")

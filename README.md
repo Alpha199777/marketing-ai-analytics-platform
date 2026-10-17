@@ -151,23 +151,29 @@ Inputs are limited to what is decided **before** launch: **budget** and **channe
 
 ### Budget Simulation (simulate_budget tool)
 
-Model: RandomForestRegressor — retrained in real-time on Databricks data
+Model: RandomForestRegressor on **budget + channel only** (`src/app/budget_simulation.py`, shared by the
+agent and the Streamlit app) — retrained in real time on Databricks data.
 
 Purpose:
 
-* Simulate the impact of a budget increase (%) on expected revenue
+* Simulate the impact of a budget change (−90 % to +300 %) on revenue
 * Available per category (social, search, influencer, media, all)
 
-Output:
+Method: the model never sees clicks or orders (they are outcomes of the budget, not levers).
+Effect = predicted revenue at the new budget − predicted revenue at the current budget, added to the observed revenue.
+Rows whose new budget exceeds the maximum observed for their channel are reported, since a forest cannot extrapolate.
+
+Output (real `marketing_kpi` data):
 
 ```
 Simulation +20% budget (social):
-  Budget actuel   : CHF 48 231
-  Budget simulé   : CHF 57 877
-  Revenue actuel  : CHF 423 890
-  Revenue simulé  : CHF 461 204
-  Delta revenue   : +CHF 37 314 (+8.8%)
-  ROI incrémental : 77.4%
+  Budget actuel     : CHF 13 798 501
+  Budget simulé     : CHF 16 558 201
+  Revenue actuel    : CHF 11 911 454
+  Revenue simulé    : CHF 14 809 803
+  Delta revenue     : +CHF 2 898 349 (+24.3%)
+  ROAS incrémental  : 1.05 (each extra franc brings 1.05 of revenue)
+  ROI incrémental   : +5%
 ```
 
 ---
@@ -219,7 +225,8 @@ compose_answer   → Business response in French with 2-4 recommendations
 
 ### Security
 
-* Parameterized SQL queries (SQL injection prevention)
+* Parameterized SQL queries (SQL injection prevention); `simulate_budget` runs a fixed query and validates
+  the category against the values present in the data
 * Whitelisted table: `marketing_kpi` only
 * Forbidden operations: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`
 * Whitelisted metrics: `roi`, `revenue`, `ctr`, `cvr`
@@ -267,7 +274,7 @@ This enables enterprise-safe AI grounded in real business data.
 | 🔮 **Prediction** | Cross-validated revenue model vs baseline, pre-launch simulation (budget + channel) with range |
 | 🧩 **Clustering** | KMeans segmentation on campaign profile, silhouette score, ROI per segment |
 | 🧠 **Agent AI** | Autonomous LangGraph agent — natural language queries on Databricks |
-| 🧬 **Fine-tuned AI** | TinyLlama 1.1B + LoRA — domain-specific marketing recommendations |
+| 🧬 **Fine-tuned AI** | TinyLlama 1.1B + LoRA — the live demo uses business rules mirroring the model's output format (model too heavy for free hosting); code to run the real model locally |
 
 ### Live Application Demo
 

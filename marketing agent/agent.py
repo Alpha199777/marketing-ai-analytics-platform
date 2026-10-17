@@ -18,6 +18,12 @@ from pydantic import BaseModel, Field
 
 from langgraph.graph import StateGraph, END
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "app"))
+from budget_simulation import simulate_budget_increase, SQL_QUERY as SIM_SQL_QUERY  # noqa: E402
+
 
 
 
@@ -232,9 +238,9 @@ def aggregate_by_dimension(group_by: str = "category") -> Dict[str, Any]:
 
 class SimulateBudgetParams(BaseModel):
 
-    budget_increase_pct: float = Field(default=20.0, description="Pourcentage d'augmentation du budget.")
+    budget_increase_pct: float = Field(default=20.0, description="Variation du budget en % (ex: 20 = +20%, -30 = -30%).")
 
-    category: str = Field(default="all", description="Catégorie à simuler (social, search, influencer, all).")
+    category: str = Field(default="all", description="Canal : all, social, search, influencer ou media.")
 
 
 
@@ -242,109 +248,15 @@ class SimulateBudgetParams(BaseModel):
 
 def simulate_budget(budget_increase_pct: float = 20.0, category: str = "all") -> Dict[str, Any]:
 
-    """Simule l'impact d'une augmentation de budget sur le revenue via RandomForest."""
-
-    import numpy as np
+    """Simule l'impact d'une variation de budget sur le revenue (modèle budget + canal, voir src/app/budget_simulation.py)."""
 
     import pandas as pd
 
-    from sklearn.ensemble import RandomForestRegressor
+    # Requête fixe, sans paramètre utilisateur : la catégorie est validée dans simulate_budget_increase
 
+    rows = run_sql(SIM_SQL_QUERY, max_rows=100000)
 
-
-    where = f"WHERE category = '{category}'" if category != "all" else ""
-
-    rows = run_sql(f"""
-
-        SELECT mark_spent, clicks, impressions, ctr, cvr, revenue
-
-        FROM marketing_kpi {where}
-
-        ORDER BY revenue DESC LIMIT 500
-
-    """)
-
-    if len(rows) < 10:
-
-        return {"summary": "Pas assez de données pour simuler.", "rows": []}
-
-
-
-    df = pd.DataFrame(rows)
-
-    for c in df.columns:
-
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-
-
-    features = [f for f in ["mark_spent", "clicks", "impressions", "ctr", "cvr"] if f in df.columns]
-
-    X = df[features].values
-
-    y = np.log1p(df["revenue"].values)
-
-
-
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-
-    model.fit(X, y)
-
-
-
-    X_base = df[features].copy()
-
-    rev_base = np.expm1(model.predict(X_base.values)).sum()
-
-
-
-    X_sim = X_base.copy()
-
-    X_sim["mark_spent"] = X_sim["mark_spent"] * (1 + budget_increase_pct / 100)
-
-    if "clicks" in features:
-
-        X_sim["clicks"] = X_sim["clicks"] * (1 + budget_increase_pct / 100 * 0.7)
-
-    rev_sim = np.expm1(model.predict(X_sim.values)).sum()
-
-
-
-    delta = rev_sim - rev_base
-
-    delta_pct = (delta / rev_base * 100) if rev_base > 0 else 0
-
-    roi_sim = delta / (df["mark_spent"].sum() * budget_increase_pct / 100) if df["mark_spent"].sum() > 0 else 0
-
-
-
-    result_rows = [{
-
-        "categorie": category,
-
-        "budget_actuel": round(df["mark_spent"].sum(), 2),
-
-        "budget_simule": round(df["mark_spent"].sum() * (1 + budget_increase_pct/100), 2),
-
-        "revenue_actuel": round(rev_base, 2),
-
-        "revenue_simule": round(rev_sim, 2),
-
-        "delta_revenue": round(delta, 2),
-
-        "delta_pct": round(delta_pct, 2),
-
-        "roi_incremental": round(roi_sim, 4),
-
-    }]
-
-    summary = (f"Simulation +{budget_increase_pct}% budget ({category}) : "
-
-               f"revenue {rev_base:,.0f} → {rev_sim:,.0f} "
-
-               f"(+{delta_pct:.1f}%, ROI incrémental : {roi_sim:.2f})")
-
-    return {"rows": result_rows, "summary": summary}
+    return simulate_budget_increase(pd.DataFrame(rows), budget_increase_pct, category)
 
 
 
