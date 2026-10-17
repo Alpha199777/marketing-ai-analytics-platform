@@ -740,9 +740,6 @@ with tab5:
    `marketing_kpi` de Databricks. Le modèle de langage n'écrit jamais de SQL lui-même : il ne peut ni modifier  
    ni supprimer de données.  
 4. **Répondre** : il rédige une réponse business à partir des chiffres obtenus, avec des recommandations.
-
-**Limites :** l'agent ne connaît que la table `marketing_kpi`. La simulation de budget est un ordre de grandeur  
-(modèle budget + canal), pas une garantie. Le détail des outils appelés est visible sous chaque réponse.
 """)
 
     missing_vars = [v for v in ["DATABRICKS_SERVER_HOSTNAME", "DATABRICKS_HTTP_PATH", "DATABRICKS_ACCESS_TOKEN", "OPENAI_API_KEY"] if not os.environ.get(v)]
@@ -1046,23 +1043,12 @@ with tab6:
     st.caption(f"Adapter [{FINETUNED_ADAPTER}](https://huggingface.co/{FINETUNED_ADAPTER}), served by the "
                f"Hugging Face Space [{FINETUNED_SPACE}](https://huggingface.co/spaces/{FINETUNED_SPACE}).")
 
-    with st.expander("ℹ️ Qu'est-ce qu'un modèle fine-tuné ?"):
+    with st.expander("ℹ️ Les deux modes de génération"):
         st.markdown("""
-**TinyLlama** est un petit modèle de langage généraliste (1,1 milliard de paramètres).  
-Le **fine-tuning** consiste à le ré-entraîner sur des exemples d'un métier précis, ici 500+ analyses de  
-campagnes marketing (KPI → recommandation), pour qu'il réponde dans ce format et avec ce vocabulaire.
-
-**LoRA** est une technique de fine-tuning économique : au lieu de modifier tout le modèle, on n'entraîne que  
-de petites couches ajoutées (0,1 % des paramètres). L'entraînement tient en quelques minutes sur un GPU gratuit.
-
-**Les deux modes :**  
 • **Fine-tuned model** : la recommandation est **rédigée par le modèle**, hébergé sur Hugging Face  
   (10 à 60 secondes, plus long si le service était en veille).  
 • **Business rules** : la même recommandation produite par des règles fixes (ROI > 150 % → scale,  
   30–150 % → optimize, < 30 % → review), instantanée. Elle sert de référence et de secours.
-
-**Les indicateurs « Derived »** (ROAS, revenu, CPL) sont calculés à partir de tes saisies pour rester cohérents  
-entre eux, comme dans les données d'entraînement.
 """)
 
     mode = st.radio("Generation", ["Fine-tuned model (Hugging Face Space)", "Business rules (instant)"],
