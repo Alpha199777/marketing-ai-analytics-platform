@@ -123,10 +123,10 @@ Figures from `marketing_kpi` (308 rows, 11 campaigns), PySpark MLlib, **5-fold c
 
 | Model | R² | Median error |
 |---|---|---|
-| RandomForest **with** `roi` (first version) | 0.82 | 20 % |
-| RandomForest without `roi` | 0.78 | 27 % |
-| Baseline: orders × average basket | **0.87** | 28 % |
-| RandomForest without `roi`, unseen campaigns | 0.58 | 45 % |
+| RandomForest **with** `roi` (first version) | 0.84 | 21 % |
+| RandomForest without `roi` | 0.81 | 26 % |
+| Baseline: orders × average basket | **0.88** | 27 % |
+| RandomForest without `roi`, unseen campaigns | 0.57 | 44 % |
 | Baseline, unseen campaigns | **0.84** | 34 % |
 
 What this shows:
@@ -141,7 +141,7 @@ What this shows:
 
 Inputs are limited to what is decided **before** launch: **budget** and **channel**.
 
-* RandomForest, cross-validated **R² ≈ 0.64**, median error ≈ 44 %
+* RandomForest, cross-validated **R² ≈ 0.63**, median error ≈ 45 %
 * Each forecast comes with an empirical range (10th–90th percentile of actual / predicted in cross-validation)
 * Influencer brings the most revenue per franc invested, social the least (≈ 27 k vs ≈ 11 k for a 10 k budget)
 * Diminishing returns: at 50 k the predicted ROI drops on every channel
@@ -314,7 +314,7 @@ Key steps:
 * Simulate a campaign before launch (budget + channel) with a range
 * Segment campaigns by profile (KMeans, silhouette)
 
-The reference run was done on **Microsoft Fabric** (Spark, Lakehouse); the notebook runs on any Spark 3.5+ environment.
+The notebook runs on **Databricks** (including serverless / Free Edition: no `df.cache()`, Spark Connect-safe model handling, ANSI-safe divisions) and on Microsoft Fabric. If `marketing_clean` does not exist, it starts from `marketing_kpi` and does not overwrite it.
 
 ---
 
