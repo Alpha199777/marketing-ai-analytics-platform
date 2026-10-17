@@ -50,7 +50,7 @@ def run_sql(query: str, params: tuple = (), max_rows: int = 200) -> List[Dict[st
 
         with conn.cursor() as cur:
 
-            cur.execute(query, params)
+            cur.execute(query, params or None)
 
             cols = [c[0] for c in cur.description] if cur.description else []
 
@@ -100,21 +100,25 @@ def get_underperforming_campaigns(roi_threshold: float = 0.0, limit: int = 10) -
 
     """Retourne les campagnes avec un ROI inférieur au seuil donné."""
 
-    query = """
+    # Valeurs converties et bornées puis insérées : pas de chaîne du LLM dans le SQL
+    threshold = float(roi_threshold)
+    if threshold != threshold or threshold in (float("inf"), float("-inf")):
+        raise ValueError("Seuil non numérique.")
+    query = f"""
 
         SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi, ctr, cvr, cpl
 
         FROM marketing_kpi
 
-        WHERE roi < ?
+        WHERE roi < {threshold!r}
 
         ORDER BY roi ASC
 
-        LIMIT ?
+        LIMIT {max(1, min(50, int(limit)))}
 
     """
 
-    rows = run_sql(query, (roi_threshold, limit))
+    rows = run_sql(query)
 
     return {"rows": rows, "summary": f"{len(rows)} campagnes sous-performantes (ROI < {roi_threshold})."}
 
@@ -152,11 +156,11 @@ def rank_campaigns(metric: str, direction: str = "top", limit: int = 10) -> Dict
 
         ORDER BY {metric} {order}
 
-        LIMIT ?
+        LIMIT {max(1, min(50, int(limit)))}
 
     """
 
-    rows = run_sql(query, (limit,))
+    rows = run_sql(query)
 
     return {"rows": rows, "summary": f"{direction} {limit} campagnes par {metric}."}
 

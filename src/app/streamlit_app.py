@@ -556,6 +556,7 @@ with tab5:
         ]))
     else:
         import json as _json
+        from math import isfinite as _np_isfinite
         from databricks import sql as _dbsql
         from langchain_openai import ChatOpenAI as _ChatOpenAI
         from langchain_core.messages import SystemMessage as _SM, HumanMessage as _HM
@@ -571,9 +572,21 @@ with tab5:
                 access_token=os.environ["DATABRICKS_ACCESS_TOKEN"],
             ) as conn:
                 with conn.cursor() as cur:
-                    cur.execute(query, params)
+                    cur.execute(query, params or None)
                     cols = [c[0] for c in cur.description] if cur.description else []
                     return [dict(zip(cols, r)) for r in cur.fetchmany(max_rows)]
+
+        # Les valeurs numériques sont converties et bornées puis insérées dans la requête :
+        # aucune chaîne venant du LLM n'entre dans le SQL, et on ne dépend pas de la syntaxe
+        # des paramètres du connecteur (`?` en mode natif, `%s` seulement en mode inline).
+        def _sql_limit(limit):
+            return max(1, min(50, int(limit)))
+
+        def _sql_float(x):
+            x = float(x)
+            if not _np_isfinite(x):
+                raise ValueError("Seuil non numérique.")
+            return repr(x)
 
         def _fmt(rows, n=8):
             if not rows: return "Aucun résultat."
@@ -586,30 +599,31 @@ with tab5:
             return "\n".join(lines)
 
         class _UP(_BM):
-            roi_threshold: float = _F(default=0.0)
-            limit: int = _F(default=10)
+            roi_threshold: float = _F(default=0.0, description="Seuil de ROI en fraction (0 = ROI nul, 0.5 = +50 %).")
+            limit: int = _F(default=10, ge=1, le=50)
 
         @_tool("get_underperforming_campaigns", args_schema=_UP)
         def _underperforming(roi_threshold=0.0, limit=10):
             """Campagnes avec ROI sous le seuil."""
             rows = _run_sql(
-                "SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi WHERE roi < %s ORDER BY roi ASC LIMIT %s",
-                (roi_threshold, limit)
+                "SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi "
+                f"WHERE roi < {_sql_float(roi_threshold)} ORDER BY roi ASC LIMIT {_sql_limit(limit)}"
             )
             return {"rows": rows, "summary": f"{len(rows)} campagnes sous-performantes (ROI < {roi_threshold})."}
 
         class _RP(_BM):
             metric: _Lit["roi", "revenue", "ctr", "cvr"] = _F(default="roi")
             direction: _Lit["top", "bottom"] = _F(default="top")
-            limit: int = _F(default=10)
+            limit: int = _F(default=10, ge=1, le=50)
 
         @_tool("rank_campaigns", args_schema=_RP)
         def _rank(metric="roi", direction="top", limit=10):
             """Classe les campagnes par métrique."""
+            if metric not in {"roi", "revenue", "ctr", "cvr"}:
+                raise ValueError("Métrique non autorisée.")
             order = "DESC" if direction == "top" else "ASC"
             rows = _run_sql(
-                f"SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi ORDER BY {metric} {order} LIMIT %s",
-                (limit,)
+                f"SELECT campaign_id, campaign_name, category, mark_spent, revenue, roi FROM marketing_kpi ORDER BY {metric} {order} LIMIT {_sql_limit(limit)}"
             )
             return {"rows": rows, "summary": f"{direction} {limit} par {metric}."}
 
@@ -771,7 +785,12 @@ with tab5:
                     with st.expander("🔍 Détails techniques (tool calls)"):
                         st.json(result["tool_calls"])
                 except Exception as e:
-                    st.error(f"Erreur agent : {e}")
+                    if "invalid access token" in str(e).lower():
+                        st.error("Databricks refuse la connexion : le jeton d'accès (DATABRICKS_ACCESS_TOKEN) est "
+                                 "invalide ou expiré. Génère un nouveau Personal Access Token dans Databricks "
+                                 "(Settings → Developer → Access tokens) et remplace-le dans les secrets Streamlit.")
+                    else:
+                        st.error(f"Erreur agent : {e}")
 
 # ============================================================
 # TAB 6 - FINE-TUNED AI
