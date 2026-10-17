@@ -182,7 +182,7 @@ Simulation +20% budget (social):
 
 Model: KMeans on **CTR, CVR, CPL and log(budget)**. Revenue and ROI are **not** used to build the segments,
 only to describe them — otherwise clustering simply rediscovers "what worked / what didn't".
-k = 4 has the best silhouette score (0.47).
+KMeans is run with 10 seeds and the best silhouette is kept (a single seed gives different segments depending on row order). k = 4 (silhouette ≈ 0.46) is retained for business reading; k = 2 scores slightly higher but is too coarse to guide budget decisions.
 
 | Segment | Profile | Median ROI |
 |---|---|---|
