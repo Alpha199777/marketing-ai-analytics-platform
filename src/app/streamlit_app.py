@@ -795,70 +795,93 @@ with tab5:
 # ============================================================
 # TAB 6 - FINE-TUNED AI
 # ============================================================
+FINETUNED_SPACE = os.environ.get("FINETUNED_SPACE", "Doers97/marketing-lora-demo")
+FINETUNED_ADAPTER = "Doers97/marketing-lora-tinyllama"
+
+
+def call_finetuned_model(space, args, timeout=180):
+    """Appelle le Space Hugging Face (TinyLlama + LoRA). Lève une exception si indisponible."""
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as _Timeout
+
+    def _call():
+        from gradio_client import Client
+        return Client(space, verbose=False).predict(*args, api_name="/recommend")
+
+    ex = ThreadPoolExecutor(max_workers=1)
+    try:
+        return ex.submit(_call).result(timeout=timeout)
+    except _Timeout:
+        raise TimeoutError(f"pas de réponse du Space en {timeout} s (il se réveille peut-être)")
+    finally:
+        ex.shutdown(wait=False)
+
+
+def rule_based_recommendation(channel, segment, roi, roas, ctr, cvr, cpl):
+    """Mêmes seuils que les étiquettes du jeu d'entraînement du modèle."""
+    if roi > 150:
+        perf, action = "HIGH", "SCALE immediately"
+        budget = f"Increase budget by 20-30%. Current ROI of {roi:.1f}% justifies aggressive scaling."
+        risk = f"Low risk - strong ROAS of {roas:.1f}x confirms sustainable performance."
+        steps = ("Allocate additional budget to top-performing ad sets", "Expand to similar audience segments")
+    elif roi > 30:
+        perf, action = "MEDIUM", "OPTIMIZE within 2 weeks"
+        budget = f"Maintain current budget. Focus on CVR improvement from {cvr:.1f}% toward 8%+."
+        risk = f"Medium risk - monitor weekly. CPL of CHF {cpl:.0f} is acceptable but improvable."
+        steps = ("A/B test landing pages to improve conversion rate", f"Review audience segmentation for {segment}")
+    else:
+        perf, action = "LOW", "REVIEW immediately"
+        budget = f"Reduce budget by 30-50% or pause campaign. ROI of {roi:.1f}% is below threshold."
+        risk = f"High risk - ROAS of {roas:.1f}x does not cover acquisition costs."
+        steps = ("Audit targeting and creative assets", "Reallocate budget to high-ROI campaigns")
+    return (f"Campaign Analysis - {channel.upper()} | {segment}\n\n"
+            f"Performance Level: {perf}\n"
+            f"Key Metrics: ROI={roi:.1f}%, ROAS={roas:.1f}x, CTR={ctr:.2f}%, CVR={cvr:.2f}%, CPL=CHF {cpl:.0f}\n\n"
+            f"Recommended Action: {action}\nBudget Strategy: {budget}\nRisk Assessment: {risk}\n\n"
+            f"Next Steps:\n1. {steps[0]}\n2. {steps[1]}\n3. Track weekly KPI evolution and adjust accordingly.")
+
+
 with tab6:
-    st.info(
-        "**Model:** TinyLlama 1.1B fine-tuned with LoRA (PEFT) on 500+ marketing KPI examples - "
-        "[Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)\n\n"
-        "**This live demo does not run the model.** The base model (~2 GB) is too heavy for free hosting, "
-        "so the recommendation below comes from **business rules** that mirror the model's output format."
-    )
-    with st.expander("▶️ Run the real fine-tuned model locally"):
-        st.code(
-            "pip install transformers peft torch\n\n"
-            "from peft import PeftModel\n"
-            "from transformers import AutoTokenizer, AutoModelForCausalLM\n\n"
-            "tokenizer = AutoTokenizer.from_pretrained(\"Doers97/marketing-lora-tinyllama\")\n"
-            "base = AutoModelForCausalLM.from_pretrained(\"TinyLlama/TinyLlama-1.1B-Chat-v1.0\")\n"
-            "model = PeftModel.from_pretrained(base, \"Doers97/marketing-lora-tinyllama\")",
-            language="python",
-        )
+    st.subheader("🧬 Fine-tuned AI — TinyLlama 1.1B + LoRA")
+    st.caption(f"Adapter [{FINETUNED_ADAPTER}](https://huggingface.co/{FINETUNED_ADAPTER}), served by the "
+               f"Hugging Face Space [{FINETUNED_SPACE}](https://huggingface.co/spaces/{FINETUNED_SPACE}).")
+
+    mode = st.radio("Generation", ["Fine-tuned model (Hugging Face Space)", "Business rules (instant)"],
+                    horizontal=True)
 
     col1, col2 = st.columns(2)
     with col1:
         channel = st.selectbox("Channel", ["social", "search", "influencer", "media", "email"])
         segment = st.selectbox("Segment", ["B2C", "B2B", "Premium", "Mass Market"])
-        spend = st.number_input("Budget (CHF)", min_value=500, max_value=100000, value=10000)
+        spend = st.number_input("Budget (CHF)", min_value=500, max_value=100000, value=10000, step=500)
+        impressions = st.number_input("Impressions", min_value=1000, max_value=5_000_000, value=200_000, step=10_000)
     with col2:
         roi = st.slider("ROI (%)", -50, 300, 45)
-        roas = st.number_input("ROAS", min_value=0.1, max_value=10.0, value=1.5, step=0.1)
         ctr_input = st.number_input("CTR (%)", min_value=0.1, max_value=20.0, value=2.5, step=0.1)
+        cvr_input = st.number_input("CVR (%)", min_value=0.1, max_value=30.0, value=5.0, step=0.1)
 
-    if st.button("🚀 Generate Recommendation (rule-based)"):
-        if roi > 150:
-            perf = "HIGH"; action = "SCALE immediately"
-            budget_advice = "Increase budget by 20-30%. Current ROI of " + str(round(roi, 1)) + "% justifies aggressive scaling."
-            risk = "Low risk - strong ROAS of " + str(round(roas, 1)) + "x confirms sustainable performance."
-        elif roi > 30:
-            perf = "MEDIUM"; action = "OPTIMIZE within 2 weeks"
-            budget_advice = "Maintain current budget. Focus on CVR improvement."
-            risk = "Medium risk - monitor weekly. CPL is acceptable but improvable."
+    # Grandeurs dérivées, calculées comme dans le jeu d'entraînement (cohérentes entre elles)
+    roas = 1 + roi / 100
+    revenue = spend * roas
+    conversions = impressions * ctr_input / 100 * cvr_input / 100
+    cpl = spend / conversions if conversions >= 1 else spend
+    st.caption(f"Derived: ROAS {roas:.2f}x · Revenue CHF {revenue:,.0f} · Conversions {conversions:,.0f} · "
+               f"CPL CHF {cpl:,.0f}".replace(",", " "))
+
+    if st.button("🚀 Generate Recommendation"):
+        rules = rule_based_recommendation(channel, segment, roi, roas, ctr_input, cvr_input, cpl)
+        if mode.startswith("Fine-tuned"):
+            with st.spinner("TinyLlama generates the recommendation (10-60 s, longer if the Space is waking up)..."):
+                try:
+                    text = call_finetuned_model(FINETUNED_SPACE, [
+                        channel, segment, float(spend), int(impressions), float(ctr_input), float(cvr_input),
+                        float(roi), float(roas), float(cpl), float(revenue)])
+                    st.success("✅ Generated by the fine-tuned model (TinyLlama 1.1B + LoRA)")
+                    st.code(text)
+                    with st.expander("Compare with the business rules"):
+                        st.code(rules)
+                except Exception as e:
+                    st.warning(f"Fine-tuned model unavailable ({e}). Showing the business-rule recommendation instead.")
+                    st.code(rules)
         else:
-            perf = "LOW"; action = "REVIEW immediately"
-            budget_advice = "Reduce budget by 30-50% or pause. ROI of " + str(round(roi, 1)) + "% is below threshold."
-            risk = "High risk - ROAS of " + str(round(roas, 1)) + "x does not cover acquisition costs."
-
-        roi_str = str(round(roi, 1)) + "%"; roas_str = str(round(roas, 1)) + "x"; ctr_str = str(round(ctr_input, 2)) + "%"
-
-        if perf == "HIGH":
-            step1 = "Allocate additional budget to top-performing ad sets"; step2 = "Expand to similar audience segments"
-        elif perf == "MEDIUM":
-            step1 = "A/B test landing pages to improve CVR"; step2 = "Review audience segmentation"
-        else:
-            step1 = "Audit targeting and creative assets"; step2 = "Reallocate budget to high-ROI campaigns"
-
-        result = (
-            "Campaign Analysis - " + channel.upper() + " | " + segment + "\n\n"
-            "Performance Level: " + perf + "\n"
-            "Key Metrics: ROI=" + roi_str + ", ROAS=" + roas_str + ", CTR=" + ctr_str + "\n\n"
-            "Recommended Action: " + action + "\n"
-            "Budget Strategy: " + budget_advice + "\n"
-            "Risk Assessment: " + risk + "\n\n"
-            "Next Steps:\n"
-            "1. " + step1 + "\n"
-            "2. " + step2 + "\n"
-            "3. Track weekly KPI evolution and adjust accordingly."
-        )
-
-        st.success("✅ Rule-based recommendation (same output format as the fine-tuned model)")
-        st.code(result)
-        st.caption("Thresholds: ROI > 150 % → scale, 30–150 % → optimize, < 30 % → review. Generated by rules, not by the LLM.")
+            st.success("✅ Business-rule recommendation (same thresholds as the model's training labels)")
+            st.code(rules)

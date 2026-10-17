@@ -274,7 +274,7 @@ This enables enterprise-safe AI grounded in real business data.
 | 🔮 **Prediction** | Cross-validated revenue model vs baseline, pre-launch simulation (budget + channel) with range |
 | 🧩 **Clustering** | KMeans segmentation on campaign profile, silhouette score, ROI per segment |
 | 🧠 **Agent AI** | Autonomous LangGraph agent — natural language queries on Databricks |
-| 🧬 **Fine-tuned AI** | TinyLlama 1.1B + LoRA — the live demo uses business rules mirroring the model's output format (model too heavy for free hosting); code to run the real model locally |
+| 🧬 **Fine-tuned AI** | TinyLlama 1.1B + LoRA served by a Hugging Face Space (`hf_space/`), with business-rule fallback when the Space is asleep |
 
 ### Live Application Demo
 
@@ -451,6 +451,11 @@ Compatible with external LLMs:
 TinyLlama 1.1B fine-tuned with LoRA (PEFT/TRL) on 500+ proprietary marketing KPI examples.
 
 **Model on HuggingFace Hub:** [Doers97/marketing-lora-tinyllama](https://huggingface.co/Doers97/marketing-lora-tinyllama)
+
+**Live inference:** Hugging Face Space [Doers97/marketing-lora-demo](https://huggingface.co/spaces/Doers97/marketing-lora-demo)
+(code in `hf_space/`). The Streamlit tab calls its `/recommend` API with `gradio_client`; the prompt reproduces the
+training format exactly. If the Space is asleep or unavailable, the tab falls back to business rules using the same
+thresholds as the training labels (ROI > 150 % → scale, 30–150 % → optimize, < 30 % → review).
 
 | Metric | Value |
 |--------|-------|

@@ -10,3 +10,4 @@ langgraph
 pydantic
 peft
 accelerate
+gradio_client
