@@ -205,6 +205,44 @@ Ce dashboard permet d'analyser la performance des campagnes marketing :
 **Impressions :** nombre de fois où la campagne est affichée  
 **Clicks :** nombre de clics générés
 """)
+        c3, c4 = st.columns(2)
+        with c3:
+            st.markdown("""
+### 🛒 CVR (Conversion Rate)
+**Définition :** CVR = Commandes / Clicks  
+**Ce que ça mesure :** le % de visiteurs qui achètent après avoir cliqué.  
+**Interprétation :**  
+• CVR élevé → l'offre et la page d'arrivée convainquent  
+• CVR faible → les gens viennent mais n'achètent pas (prix, page, ciblage)  
+**Exemple :** 1 000 clicks, 30 commandes → CVR = 3%
+""")
+        with c4:
+            st.markdown("""
+### 🎯 CPL (Coût par lead)
+**Définition :** CPL = Budget dépensé / Leads  
+**Ce que ça mesure :** combien coûte un contact intéressé (inscription, demande de devis…).  
+**Interprétation :**  
+• CPL bas → on obtient des prospects à bon prix  
+• CPL élevé → la campagne coûte cher pour ce qu'elle rapporte en contacts  
+**Exemple :** 5 000 CHF dépensés, 100 leads → CPL = 50 CHF
+""")
+        st.markdown("""
+---
+### 🧭 Pourquoi ces indicateurs ?
+Une campagne fait avancer un client étape par étape :  
+**affichage → clic → contact (lead) → commande → revenu**.  
+Chaque indicateur mesure **une étape**, ce qui permet de savoir **où** une campagne perd de la valeur :
+
+| Étape | Indicateur | Question à laquelle il répond |
+|---|---|---|
+| Affichage → clic | **CTR** | Le message attire-t-il l'attention ? |
+| Clic → commande | **CVR** | Les visiteurs achètent-ils ? |
+| Coût d'un contact | **CPL** | Combien paie-t-on pour un prospect ? |
+| Résultat final | **ROAS / ROI** | La campagne rapporte-t-elle plus qu'elle ne coûte ? |
+
+Une campagne peut avoir un très bon CTR et un mauvais ROI : elle attire, mais ne convertit pas. Regarder un seul  
+indicateur ne suffit donc pas.
+""")
 
     st.divider()
 
@@ -275,6 +313,13 @@ with tab2:
 **Interprétation rapide :**
 - **ROAS = revenue / spend** "combien je récupère pour 1CHF dépensé"
 - **ROI = (revenue - spend) / spend** "mon gain net relatif"
+
+**Exemple :** je dépense **1 000 CHF** et la campagne rapporte **1 500 CHF**
+→ ROAS = 1 500 / 1 000 = **1,5x** (je récupère 1,50 CHF pour 1 CHF investi)
+→ ROI = (1 500 − 1 000) / 1 000 = **+50 %** (je gagne 50 % de ce que j'ai investi)
+
+**Repères :** ROAS < 1 (ou ROI < 0) → la campagne **perd de l'argent** ; ROAS = 1 (ROI = 0) → elle rembourse
+juste son coût ; ROAS > 1 (ROI > 0) → elle est **rentable**.
         """)
 
         by_campaign = (
@@ -352,20 +397,69 @@ def train_simulation_model(data: pd.DataFrame):
 with tab3:
     st.subheader("🔮 Revenu : expliquer, puis simuler")
 
-    with st.expander("ℹ️ Méthode et métriques"):
+    with st.expander("ℹ️ Comprendre cette page : objectif, métriques et méthode"):
         st.markdown("""
-**Validation croisée (5 parts)** : chaque ligne est prédite par un modèle qui ne l'a jamais vue.
-Avec quelques centaines de lignes, un seul découpage train/test donne un score qui dépend beaucoup du tirage.
+### 🎯 Objectif
+Cette page répond à deux questions différentes, avec deux modèles différents :
 
-**R²** : part de la variation du revenu expliquée (1 = parfait, 0 = pas mieux que la moyenne).
-**Erreur médiane** : la moitié des prédictions se trompent de moins que ce pourcentage. Plus robuste que le MAPE,
-qui explose sur les petites campagnes.
+1. **Expliquer** : « pourquoi telle campagne terminée a-t-elle rapporté ce revenu ? »  
+   → on utilise tout ce qu'on sait de la campagne (clics, leads, commandes…).  
+2. **Simuler** : « si je lance une campagne avec tel budget sur tel canal, combien puis-je espérer ? »  
+   → on n'utilise que ce qu'on connaît **avant** de lancer : le budget et le canal.
 
-**Pourquoi pas le ROI en entrée ?** ROI = (revenue − spend) / spend : il contient la réponse.
-Le modèle aurait l'air excellent, mais il tricherait.
+---
 
-**Pourquoi une référence ?** Un modèle n'est utile que s'il fait mieux qu'une règle simple.
-Ici : revenu = commandes x panier moyen.
+### 📊 R² (coefficient de détermination)
+**Ce que ça mesure :** quelle part des différences de revenu entre campagnes le modèle arrive à expliquer.  
+• R² = 1.0 → prédiction parfaite | R² = 0 → pas mieux que de toujours prédire la moyenne | R² < 0 → pire que la moyenne  
+**Repères en marketing :** 0.3–0.6 = bon | 0.6–0.8 = très bon | 0.8+ = excellent (ou suspect : à vérifier !)
+
+---
+
+### 📉 Erreur médiane et MAPE (%)
+**MAPE** = erreur moyenne en pourcentage du revenu réel. < 10% excellent | 10–25% bon | > 50% améliorable  
+**Erreur médiane** = la moitié des prédictions se trompent de moins que ce pourcentage.  
+On affiche les deux car le MAPE est faussé par les petites campagnes : se tromper de 500 CHF sur une campagne  
+qui a rapporté 100 CHF compte comme une erreur de 500 %.
+
+---
+
+### 🧪 Validation croisée (5 parts) : pourquoi les scores sont « honnêtes »
+On découpe les données en 5 parts. Le modèle apprend sur 4 parts et est noté sur la 5e, qu'il n'a jamais vue.  
+On recommence 5 fois pour que chaque ligne soit notée une fois.  
+→ C'est comme un examen avec des questions que l'élève n'a pas vues en cours : le score reflète ce que le modèle  
+fera sur de nouvelles campagnes, pas sa capacité à réciter le passé.
+
+---
+
+### 🚫 Pourquoi le ROI n'est pas utilisé pour prédire le revenu
+Le ROI se calcule **à partir du revenu** : ROI = (revenu − budget) / budget.  
+Donner le ROI au modèle, c'est lui donner la réponse : il aurait l'air excellent, mais il tricherait.  
+C'est une erreur classique appelée **fuite de données** (data leakage).
+
+---
+
+### ⚖️ Pourquoi comparer avec une « référence » simple
+Un modèle de machine learning n'a d'intérêt que s'il fait **mieux qu'une règle de bon sens**.  
+Ici la règle est : **revenu ≈ nombre de commandes × panier moyen**. Si elle fait aussi bien que le RandomForest,  
+le modèle n'apporte rien de plus : c'est un vrai résultat, pas un échec.
+
+---
+
+### 🔮 Comment lire la simulation
+• **Revenu prévu** : l'estimation centrale.  
+• **Fourchette** : 8 campagnes passées sur 10 se situaient dans cet intervalle par rapport à la prévision.  
+C'est l'information la plus utile : elle montre l'incertitude réelle.  
+• **Courbe par canal** : si elle s'aplatit quand le budget augmente, chaque franc supplémentaire rapporte moins  
+(**rendements décroissants**).  
+• **Hors plage observée** : budget jamais vu dans les données pour ce canal → la prévision n'est pas fiable.
+
+---
+
+### 💼 Business value
+• comparer les canaux avant d'investir  
+• estimer un ordre de grandeur de revenu et le risque associé (fourchette)  
+• repérer le budget au-delà duquel investir davantage rapporte peu
 """)
 
     if len(dff) < 30:
@@ -456,6 +550,55 @@ with tab4:
     st.caption("Chaque point est une ligne campagne x date. Les segments sont formés sur le **profil** "
                "(CTR, CVR, CPL, budget) ; le ROI et le revenu servent seulement à les décrire.")
 
+    with st.expander("ℹ️ Comprendre la segmentation : objectif, choix des métriques, lecture"):
+        st.markdown("""
+### 🎯 Objectif
+Regrouper automatiquement les campagnes **qui se ressemblent**, pour décider quoi faire de chaque groupe  
+(développer, optimiser, couper) au lieu d'analyser les campagnes une par une.
+
+---
+
+### 🤖 Comment ça marche (KMeans)
+On choisit un nombre de groupes **k**. L'algorithme place chaque campagne dans le groupe dont elle est la plus  
+proche, en comparant ses indicateurs. Il n'utilise aucune étiquette « bonne » ou « mauvaise » campagne :  
+il découvre les groupes tout seul.
+
+---
+
+### 🧭 Pourquoi ces 4 métriques
+| Métrique | Ce qu'elle décrit |
+|---|---|
+| **CTR** | l'attractivité du message |
+| **CVR** | la capacité à transformer un visiteur en client |
+| **CPL** | le coût d'acquisition d'un prospect |
+| **Budget** (en log) | la taille de la campagne |
+
+Elles décrivent **comment** une campagne fonctionne. Le budget est pris en logarithme pour que quelques très  
+grosses campagnes n'écrasent pas toutes les autres. Toutes les métriques sont mises à la même échelle avant le  
+calcul, sinon le budget (en milliers) compterait plus que le CTR (en %).
+
+### 🚫 Pourquoi pas le ROI ni le revenu
+Ce sont les **résultats** que l'on cherche à expliquer. Les utiliser pour former les groupes reviendrait à trier  
+les campagnes entre « celles qui ont marché » et « celles qui n'ont pas marché », ce qu'on sait déjà.  
+En les gardant de côté, on peut vérifier ensuite que les groupes ont des ROI très différents : c'est la preuve  
+que le **profil** d'une campagne suffit à prévoir si elle sera rentable.
+
+---
+
+### 📏 Score de silhouette
+Mesure si les groupes sont bien séparés, de −1 à 1 :  
+**> 0,5** groupes nets | **0,25–0,5** groupes acceptables, avec des chevauchements | **< 0,25** groupes peu distincts.  
+Le meilleur k mathématique n'est pas toujours le plus utile : 2 groupes peuvent être bien séparés mais trop  
+grossiers pour décider d'un budget. Utilise le curseur pour comparer.
+
+---
+
+### 👀 Lire les graphiques
+• **Gauche (CTR vs CPL)** : où se situe chaque groupe. En bas à droite = attire beaucoup et coûte peu (idéal).  
+• **Droite (ROI par segment)** : la boîte contient la moitié des campagnes du groupe, la ligne  
+au milieu est le ROI médian. En dessous de la ligne pointillée (0), le groupe perd de l'argent.
+""")
+
     profile_feats = [f for f in ["ctr", "cvr", "cpl"] if f in dff.columns]
     data_c = dff.replace([np.inf, -np.inf], np.nan).copy()
     if "spend" in data_c.columns:
@@ -543,6 +686,20 @@ with tab4:
 with tab5:
     st.subheader("🧠 Agent Autonome Marketing")
     st.caption("Pose une question en langage naturel - l'agent interroge la base Databricks et répond.")
+    with st.expander("ℹ️ Comment fonctionne l'agent"):
+        st.markdown("""
+1. **Comprendre** : un modèle de langage (GPT-4o-mini) identifie le type de question  
+   (classement, diagnostic, segmentation, simulation de budget).  
+2. **Choisir un outil** : il choisit parmi 4 outils prédéfinis (classer les campagnes, trouver les campagnes  
+   sous-performantes, agréger par canal, simuler une variation de budget).  
+3. **Interroger les données** : l'outil exécute une requête SQL **prédéfinie, qui ne fait que lire** la table  
+   `marketing_kpi` de Databricks. Le modèle de langage n'écrit jamais de SQL lui-même : il ne peut ni modifier  
+   ni supprimer de données.  
+4. **Répondre** : il rédige une réponse business à partir des chiffres obtenus, avec des recommandations.
+
+**Limites :** l'agent ne connaît que la table `marketing_kpi`. La simulation de budget est un ordre de grandeur  
+(modèle budget + canal), pas une garantie. Le détail des outils appelés est visible sous chaque réponse.
+""")
 
     missing_vars = [v for v in ["DATABRICKS_SERVER_HOSTNAME", "DATABRICKS_HTTP_PATH", "DATABRICKS_ACCESS_TOKEN", "OPENAI_API_KEY"] if not os.environ.get(v)]
 
@@ -844,6 +1001,25 @@ with tab6:
     st.subheader("🧬 Fine-tuned AI — TinyLlama 1.1B + LoRA")
     st.caption(f"Adapter [{FINETUNED_ADAPTER}](https://huggingface.co/{FINETUNED_ADAPTER}), served by the "
                f"Hugging Face Space [{FINETUNED_SPACE}](https://huggingface.co/spaces/{FINETUNED_SPACE}).")
+
+    with st.expander("ℹ️ Qu'est-ce qu'un modèle fine-tuné ?"):
+        st.markdown("""
+**TinyLlama** est un petit modèle de langage généraliste (1,1 milliard de paramètres).  
+Le **fine-tuning** consiste à le ré-entraîner sur des exemples d'un métier précis, ici 500+ analyses de  
+campagnes marketing (KPI → recommandation), pour qu'il réponde dans ce format et avec ce vocabulaire.
+
+**LoRA** est une technique de fine-tuning économique : au lieu de modifier tout le modèle, on n'entraîne que  
+de petites couches ajoutées (0,1 % des paramètres). L'entraînement tient en quelques minutes sur un GPU gratuit.
+
+**Les deux modes :**  
+• **Fine-tuned model** : la recommandation est **rédigée par le modèle**, hébergé sur Hugging Face  
+  (10 à 60 secondes, plus long si le service était en veille).  
+• **Business rules** : la même recommandation produite par des règles fixes (ROI > 150 % → scale,  
+  30–150 % → optimize, < 30 % → review), instantanée. Elle sert de référence et de secours.
+
+**Les indicateurs « Derived »** (ROAS, revenu, CPL) sont calculés à partir de tes saisies pour rester cohérents  
+entre eux, comme dans les données d'entraînement.
+""")
 
     mode = st.radio("Generation", ["Fine-tuned model (Hugging Face Space)", "Business rules (instant)"],
                     horizontal=True)
