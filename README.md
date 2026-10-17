@@ -393,12 +393,13 @@ Includes:
 ### Screenshots (/screenshots)
 
 * kpi_table.PNG — KPI metrics layer
-* Graphique clusters.PNG — Campaign clusters visualization (first version)
-* Graphique et commentaires clusters.PNG — Cluster interpretation (first version)
-* Tableau des clusters.PNG — Campaign performance grouping (first version)
-
-The three cluster screenshots show the first segmentation, which used revenue and ROI as inputs.
+* importances_regression.png — Feature importances of the explanatory RandomForest and reading of the cross-validated results (Databricks run)
+* simulation_budget_canal_cv.png — Pre-launch simulation model (budget + channel): cross-validated R², median error, empirical range
+* simulation_par_canal.png — Forecast revenue, range and ROI per channel and budget
+* segments_ctr_cpl_roi.png — KMeans segments on campaign profile (CTR vs CPL) and ROI per segment
 * ai_marketing_decision_platform.png — End-to-end architecture
+
+All results screenshots come from the notebook run on Databricks (serverless) and show aggregates only — no campaign-level rows.
 
 These artifacts demonstrate a fully functional analytics and AI pipeline.
 
