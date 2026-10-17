@@ -1,10 +1,13 @@
-Model: LinearRegression (PySpark MLlib)
+# Model training
 
-Baseline (no model):
-- Using average revenue: RMSE = 320
+Data: `marketing_kpi` (308 rows, 11 campaigns). All metrics from 5-fold cross-validation.
 
-Trained model:
-- RMSE = 185
-- Better revenue ranking of campaigns
+Explanatory model: RandomForestRegressor (PySpark MLlib, 50 trees, max depth 8), without `roi`.
+- R² = 0.78, median error = 27 %
+- Baseline `revenue = orders × average basket`: R² = 0.87 → the baseline wins.
 
-This shows learning from data instead of heuristics.
+Simulation model: RandomForestRegressor (200 trees, max depth 6, all features per split),
+inputs = budget + channel.
+- R² = 0.64, median error = 44 %
+
+See `evaluation.md` for the method and the README for the full results.

@@ -4,8 +4,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, cross_val_predict
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 
@@ -23,9 +25,9 @@ def norm_cols(df):
 
 def map_schema(df):
     df = norm_cols(df)
-    df["campaign"] = df["campaign"].str.lower().str.strip()
     rename_map = {"c_date": "date", "campaign_name": "campaign", "mark_spent": "spend"}
     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+    df["campaign"] = df["campaign"].astype(str).str.lower().str.strip()
     return df
 
 @st.cache_data(ttl=300)
@@ -71,6 +73,10 @@ def compute_metrics(df):
     df["ctr"] = safe_div(df["clicks"], df["impressions"])
     df["rev_per_click"] = safe_div(df["revenue"], df["clicks"])
     df["rev_per_1k_impr"] = safe_div(df["revenue"] * 1000, df["impressions"])
+    if "orders" in df.columns:
+        df["cvr"] = safe_div(df["orders"], df["clicks"])
+    if "spend" in df.columns and "leads" in df.columns:
+        df["cpl"] = safe_div(df["spend"], df["leads"])
     if "spend" in df.columns:
         df["roas"] = safe_div(df["revenue"], df["spend"])
         df["roi"] = safe_div(df["revenue"] - df["spend"], df["spend"])
@@ -288,155 +294,246 @@ with tab2:
 # ============================================================
 # TAB 3 - Prediction
 # ============================================================
+N_FOLDS = 5
+
+
+def reg_metrics(y_true, y_pred) -> dict:
+    """R², erreur médiane et MAPE (sur les lignes à revenu > 0)."""
+    y_true = np.asarray(y_true, dtype="float64")
+    y_pred = np.asarray(y_pred, dtype="float64")
+    pos = y_true > 0
+    ape = np.abs(y_true[pos] - y_pred[pos]) / y_true[pos]
+    return {
+        "R²": r2_score(y_true, y_pred),
+        "Erreur médiane": float(np.median(ape)) if pos.any() else np.nan,
+        "MAPE": float(np.mean(ape)) if pos.any() else np.nan,
+    }
+
+
+@st.cache_data(show_spinner="Validation croisée en cours…")
+def evaluate_explain_models(data: pd.DataFrame, features: tuple, has_orders: bool):
+    """Compare en validation croisée le RandomForest et la référence « commandes x panier moyen »."""
+    X, y = data[list(features)].values, data["revenue"].values
+    cv = KFold(n_splits=N_FOLDS, shuffle=True, random_state=42)
+    rf = RandomForestRegressor(n_estimators=200, max_depth=8, random_state=42, n_jobs=-1)
+    rows = [{"Modèle": "RandomForest (" + ", ".join(features) + ")", **reg_metrics(y, cross_val_predict(rf, X, y, cv=cv))}]
+    if has_orders:
+        base = LinearRegression(fit_intercept=False)
+        p = cross_val_predict(base, data[["orders"]].values, y, cv=cv)
+        rows.append({"Modèle": "Référence : commandes x panier moyen", **reg_metrics(y, p)})
+    importances = pd.Series(rf.fit(X, y).feature_importances_, index=list(features)).sort_values()
+    return pd.DataFrame(rows), importances
+
+
+def sim_design(spend, category, categories) -> pd.DataFrame:
+    X = pd.DataFrame({"spend": np.asarray(spend, dtype="float64")})
+    for c in categories:
+        X["cat_" + c] = (np.asarray(category) == c).astype(float)
+    return X
+
+
+@st.cache_data(show_spinner="Entraînement du modèle de simulation…")
+def train_simulation_model(data: pd.DataFrame):
+    """Modèle avant lancement : n'utilise que le budget et le canal."""
+    categories = tuple(sorted(data["category"].astype(str).unique()))
+    X = sim_design(data["spend"], data["category"].astype(str), categories)
+    y = data["revenue"].values
+    model = RandomForestRegressor(n_estimators=200, max_depth=6, min_samples_leaf=5, random_state=42, n_jobs=-1)
+    p = cross_val_predict(model, X, y, cv=KFold(n_splits=N_FOLDS, shuffle=True, random_state=42))
+    ratio = y[p > 0] / p[p > 0]
+    q_low, q_high = np.quantile(ratio, [0.1, 0.9])
+    model.fit(X, y)
+    ranges = data.groupby(data["category"].astype(str))["spend"].agg(["min", "max"])
+    return model, categories, reg_metrics(y, p), float(q_low), float(q_high), ranges
+
+
 with tab3:
-    st.subheader("🔮 Prédire le revenue (RandomForest)")
-    with st.expander("ℹ️ Comprendre les métriques de prédiction (R², MAPE, log)"):
+    st.subheader("🔮 Revenu : expliquer, puis simuler")
+
+    with st.expander("ℹ️ Méthode et métriques"):
         st.markdown("""
-### 🎯 Objectif
-Ce modèle utilise le machine learning pour prédire le **revenue attendu d'une campagne marketing**.
+**Validation croisée (5 parts)** : chaque ligne est prédite par un modèle qui ne l'a jamais vue.
+Avec quelques centaines de lignes, un seul découpage train/test donne un score qui dépend beaucoup du tirage.
 
----
+**R²** : part de la variation du revenu expliquée (1 = parfait, 0 = pas mieux que la moyenne).
+**Erreur médiane** : la moitié des prédictions se trompent de moins que ce pourcentage. Plus robuste que le MAPE,
+qui explose sur les petites campagnes.
 
-### 📊 R² (coefficient de détermination)
-• R² = 1.0 → prédiction parfaite | R² = 0 → modèle inutile | R² < 0 → moins bon qu'une moyenne
+**Pourquoi pas le ROI en entrée ?** ROI = (revenue − spend) / spend : il contient la réponse.
+Le modèle aurait l'air excellent, mais il tricherait.
 
-Dans le marketing réel : 0.3–0.6 = bon | 0.6–0.8 = très bon | 0.8+ = excellent
-
----
-
-### 📉 MAPE (%)
-MAPE = erreur moyenne en pourcentage. < 10% excellent | 10–25% bon | > 50% améliorable
-
----
-
-### 🔄 Pourquoi utiliser log(revenue)
-Le revenue marketing est souvent très asymétrique. Le log stabilise le modèle et évite qu'une grosse campagne casse l'apprentissage.
+**Pourquoi une référence ?** Un modèle n'est utile que s'il fait mieux qu'une règle simple.
+Ici : revenu = commandes x panier moyen.
 """)
 
-    features_candidates = ["impressions", "clicks", "ctr"]
-    if "spend" in dff.columns: features_candidates.append("spend")
-    if "leads" in dff.columns: features_candidates.append("leads")
-    if "orders" in dff.columns: features_candidates.append("orders")
-
-    st.caption(f"Features possibles: {', '.join(features_candidates)}")
-    features = st.multiselect("Features utilisées", options=features_candidates, default=features_candidates[:3])
-
-    if len(dff) < 20 or len(features) < 2:
-        st.warning("Il faut au moins ~20 lignes et 2 features pour entraîner un modèle stable.")
+    if len(dff) < 30:
+        st.warning("Il faut au moins ~30 lignes pour une validation croisée fiable : élargis les filtres.")
     else:
-        X = dff[features].copy()
-        y = dff["revenue"].copy()
-        y_log = np.log1p(y)
-        X_train, X_test, y_train, y_test = train_test_split(X, y_log, test_size=0.2, random_state=42)
-        model = RandomForestRegressor(n_estimators=300, random_state=42)
-        model.fit(X_train, y_train)
-        pred_log = model.predict(X_test)
-        pred = np.expm1(pred_log)
-        y_true = np.expm1(y_test)
-        r2 = model.score(X_test, y_test)
-        y_true_np = np.array(y_true, dtype="float64"); pred_np = np.array(pred, dtype="float64")
-        mask = y_true_np > 0
-        mape = np.mean(np.abs((y_true_np[mask] - pred_np[mask]) / y_true_np[mask])) if mask.any() else np.nan
+        # ---------- 1. Expliquer ----------
+        st.markdown("### 1. Expliquer le revenu d'une campagne terminée")
+        explain_feats = tuple(f for f in ["impressions", "clicks", "leads", "orders", "spend", "ctr", "cvr", "cpl"]
+                              if f in dff.columns)
+        data_ml = dff[list(explain_feats) + ["revenue"]].replace([np.inf, -np.inf], np.nan).fillna(0)
+        results, importances = evaluate_explain_models(data_ml, explain_feats, "orders" in dff.columns)
 
-        a, b, c = st.columns(3)
-        a.metric("R² (log space)", f"{r2:.3f}")
-        b.metric("MAPE (sur y>0)", format_pct(mape) if np.isfinite(mape) else "-")
-        c.metric("Features utilisées", ", ".join(features))
+        st.dataframe(
+            results.style.format({"R²": "{:.2f}", "Erreur médiane": "{:.0%}", "MAPE": "{:.0%}"}),
+            use_container_width=True, hide_index=True,
+        )
+        left, right = st.columns([3, 2])
+        with left:
+            if len(results) > 1 and results.loc[1, "R²"] >= results.loc[0, "R²"]:
+                st.info("La règle simple **commandes x panier moyen** fait au moins aussi bien que le RandomForest : "
+                        "le revenu se déduit des commandes. Ce modèle explique le passé, il ne peut pas simuler une "
+                        "campagne future (on ne connaît pas ses commandes à l'avance).")
+            else:
+                st.info("Ce modèle utilise des résultats de campagne (clics, commandes…) : il explique le passé "
+                        "mais ne peut pas simuler une campagne avant son lancement.")
+        with right:
+            fig_imp = px.bar(importances, orientation="h", labels={"value": "importance", "index": ""},
+                             title="Variables utilisées par le RandomForest")
+            fig_imp.update_layout(showlegend=False, height=280, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig_imp, use_container_width=True)
 
+        # ---------- 2. Simuler ----------
         st.divider()
-        st.markdown("### ✍️ Simuler une campagne")
-        cols_ui = st.columns(len(features))
-        user_vals = {}
-        for i, f in enumerate(features):
-            with cols_ui[i]:
-                default_val = float(np.nanmedian(dff[f])) if np.isfinite(np.nanmedian(dff[f])) else 0.0
-                user_vals[f] = st.number_input(f, value=float(default_val), step=1.0)
+        st.markdown("### 2. Simuler une campagne avant son lancement")
+        if not {"spend", "category"}.issubset(dff.columns):
+            st.warning("La simulation demande les colonnes **spend** (ou mark_spent) et **category** dans les données.")
+        else:
+            st.caption("Le modèle ne reçoit que ce que l'on décide avant le lancement : le **budget** et le **canal**.")
+            sim_data = dff[["spend", "category", "revenue"]].dropna()
+            model, categories, sim_m, q_low, q_high, ranges = train_simulation_model(sim_data)
 
-        sim = pd.DataFrame([user_vals])
-        pred_sim = np.expm1(model.predict(sim)[0])
-        st.success(f"📈 Revenue prédit : **{format_money(pred_sim)}**")
-        st.info("💡 Utiliser les prédictions comme indication. **démo** (meilleur avec +features et +données).")
+            a, b = st.columns(2)
+            a.metric("R² (validation croisée)", f"{sim_m['R²']:.2f}")
+            b.metric("Erreur médiane", format_pct(sim_m["Erreur médiane"]))
+
+            c1, c2 = st.columns(2)
+            with c1:
+                sim_cat = st.selectbox("Canal", options=list(categories))
+            with c2:
+                sim_budget = st.number_input("Budget (CHF)", min_value=0.0, step=1000.0,
+                                             value=float(round(np.nanmedian(sim_data["spend"]), -3)))
+
+            pred = float(model.predict(sim_design([sim_budget], [sim_cat], categories))[0])
+            roi_pred = (pred - sim_budget) / sim_budget if sim_budget > 0 else np.nan
+            r1, r2c, r3 = st.columns(3)
+            r1.metric("Revenu prévu", format_money(pred))
+            r2c.metric("Fourchette (80 % des cas passés)", f"{format_money(pred * q_low)} – {format_money(pred * q_high)}")
+            r3.metric("ROI prévu", f"{roi_pred:+.2f}" if np.isfinite(roi_pred) else "—")
+
+            lo, hi = ranges.loc[sim_cat, "min"], ranges.loc[sim_cat, "max"]
+            if not lo <= sim_budget <= hi:
+                st.warning(f"Budget hors de la plage observée pour **{sim_cat}** ({format_money(lo)} – {format_money(hi)}) : "
+                           "le modèle extrapole, la prévision n'est pas fiable.")
+
+            # Courbe de réponse : revenu prévu selon le budget, par canal
+            grid = np.linspace(np.nanpercentile(sim_data["spend"], 5), np.nanpercentile(sim_data["spend"], 95), 40)
+            curve = pd.concat([
+                pd.DataFrame({"budget": grid, "canal": c,
+                              "revenu_prevu": model.predict(sim_design(grid, [c] * len(grid), categories))})
+                for c in categories
+            ])
+            fig_curve = px.line(curve, x="budget", y="revenu_prevu", color="canal",
+                                labels={"budget": "Budget (CHF)", "revenu_prevu": "Revenu prévu (CHF)", "canal": "Canal"},
+                                title="Revenu prévu selon le budget et le canal")
+            fig_curve.add_scatter(x=[sim_budget], y=[pred], mode="markers", marker=dict(size=12, color="black"),
+                                  name="Ta simulation")
+            fig_curve.update_layout(height=420, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig_curve, use_container_width=True)
+
+            st.info("💡 Lis la fourchette plutôt que le chiffre central : budget et canal n'expliquent qu'une partie "
+                    "du revenu (création, ciblage et saisonnalité ne sont pas dans les données).")
 
 # ============================================================
 # TAB 4 - Clustering
 # ============================================================
 with tab4:
     st.subheader("🧩 Segmentation des campagnes (KMeans)")
+    st.caption("Chaque point est une ligne campagne x date. Les segments sont formés sur le **profil** "
+               "(CTR, CVR, CPL, budget) ; le ROI et le revenu servent seulement à les décrire.")
 
-    # Whitelist strict : seules ces colonnes sont autorisées dans le clustering
-    # Évite que des colonnes inattendues du CSV (ex: "Roas", "King"...) n'apparaissent dans les dropdowns
-    KNOWN_CLUSTER_METRICS = ["revenue", "clicks", "impressions", "ctr", "spend", "roas", "roi"]
+    profile_feats = [f for f in ["ctr", "cvr", "cpl"] if f in dff.columns]
+    data_c = dff.replace([np.inf, -np.inf], np.nan).copy()
+    if "spend" in data_c.columns:
+        data_c["log_spend"] = np.log1p(data_c["spend"])
+        profile_feats.append("log_spend")
+    data_c[profile_feats] = data_c[profile_feats].fillna(0)
 
-    grp_cols = [c for c in KNOWN_CLUSTER_METRICS if c in dff.columns]
-
-    agg = (
-        dff.groupby("campaign", as_index=False)
-        .agg({c: "mean" for c in grp_cols})
-    ).replace([np.inf, -np.inf], np.nan).fillna(0)
-
-    if len(agg) < 6:
-        st.warning("Pas assez de campagnes distinctes pour clusteriser (il faut au moins ~6).")
+    if len(profile_feats) < 2:
+        st.warning("Pas assez de variables de profil : il faut au moins spend, leads ou orders en plus des clics.")
+    elif len(data_c) < 20:
+        st.warning("Pas assez de lignes pour segmenter (il faut au moins ~20) : élargis les filtres.")
     else:
-        k = st.slider("Nombre de clusters (k)", 2, 6, 4)
-        features_clust = [c for c in KNOWN_CLUSTER_METRICS if c in agg.columns]
-        X = agg[features_clust].values
-        scaler = StandardScaler()
-        Xs = scaler.fit_transform(X)
-        km = KMeans(n_clusters=k, random_state=42, n_init=10)
-        agg["cluster"] = km.fit_predict(Xs)
+        Xs = StandardScaler().fit_transform(data_c[profile_feats].values)
 
-        st.markdown("### 📌 Résumé clusters")
-        summary = agg.groupby("cluster", as_index=False).agg({c: "mean" for c in features_clust} | {"campaign": "count"})
-        summary = summary.rename(columns={"campaign": "n_campaigns"})
-        st.dataframe(summary, use_container_width=True, height=220)
+        sil = {k: silhouette_score(Xs, KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(Xs))
+               for k in range(2, 7)}
+        best_k = max(sil, key=sil.get)
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            k = st.slider("Nombre de segments (k)", 2, 6, 4)
+            st.caption("Silhouette par k (plus haut = segments mieux séparés) : "
+                       + " · ".join(f"k={kk} : {v:.2f}" for kk, v in sil.items())
+                       + f". Meilleur k : **{best_k}**.")
 
-        st.markdown("### 🎨 Visualisation (couleur + taille)")
-        x_axis = st.selectbox("Axe X", options=features_clust, index=features_clust.index("revenue") if "revenue" in features_clust else 0)
-        y_axis = st.selectbox("Axe Y", options=features_clust, index=features_clust.index("ctr") if "ctr" in features_clust else 1)
-        size_axis = st.selectbox("Taille des points", options=features_clust, index=features_clust.index("impressions") if "impressions" in features_clust else 0)
+        data_c["cluster"] = KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(Xs).astype(str)
 
-        agg["cluster_label"] = agg["cluster"].astype(str)
-        cluster_color_map = {str(i): c for i, c in enumerate(["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"])}
+        desc_cols = [c for c in ["roi", "revenue", "spend", "ctr", "cvr", "cpl"] if c in data_c.columns]
+        summary = (data_c.groupby("cluster")
+                   .agg(n_lignes=("revenue", "size"), **{c: (c, "median") for c in desc_cols})
+                   .reset_index())
+        if "roi" in summary.columns:
+            summary = summary.sort_values("roi", ascending=False)
 
-        # FIX 2: use x_axis, y_axis, size_axis instead of hardcoded "roi", "revenue", "revenue"
-        fig = px.scatter(
-            agg, x=x_axis, y=y_axis, color="cluster_label", size=size_axis,
-            hover_name="campaign", color_discrete_map=cluster_color_map,
-            labels={"cluster_label": "Cluster"}, size_max=40
-        )
-        fig.update_layout(height=600, title=f"Segmentation des campagnes ({x_axis} vs {y_axis})", legend_title="Cluster", margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(fig, use_container_width=True)
+        with c2:
+            st.markdown("**Profil médian de chaque segment**")
+            st.dataframe(summary.style.format({"roi": "{:+.2f}", "revenue": "{:,.0f}", "spend": "{:,.0f}",
+                                               "ctr": "{:.2%}", "cvr": "{:.2%}", "cpl": "{:,.0f}"}),
+                         use_container_width=True, hide_index=True)
 
-        # Pas de second "Résumé clusters" — on réutilise summary déjà affiché en haut
-        st.markdown("### 🧠 Commentaire (portfolio)")
-        PALETTE = ["#2ecc71","#3498db","#f39c12","#e74c3c","#9b59b6","#1abc9c"]
-        EMOJI_DOT = ["🟣","🔵","🟠","🟢","🔴","🩵"]
+        g1, g2 = st.columns(2)
+        with g1:
+            x_ax, y_ax = profile_feats[0], ("cpl" if "cpl" in profile_feats else profile_feats[1])
+            fig = px.scatter(data_c, x=x_ax, y=y_ax, color="cluster", hover_name="campaign",
+                             category_orders={"cluster": sorted(data_c["cluster"].unique())},
+                             title=f"Profil des segments : {x_ax.upper()} vs {y_ax.upper()}")
+            fig.update_layout(height=450, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig, use_container_width=True)
+        with g2:
+            if "roi" in data_c.columns:
+                fig_roi = px.box(data_c, x="cluster", y="roi", color="cluster", points="outliers",
+                                 category_orders={"cluster": sorted(data_c["cluster"].unique())},
+                                 title="ROI par segment (non utilisé pour le clustering)")
+                fig_roi.add_hline(y=0, line_dash="dash", line_color="grey")
+                fig_roi.update_layout(height=450, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
+                st.plotly_chart(fig_roi, use_container_width=True)
 
-        roi_col = "roi" if "roi" in summary.columns else "revenue"
-        for _, row in summary.iterrows():
-            cluster = int(row["cluster"])
-            roi = row[roi_col]
-            dot = EMOJI_DOT[cluster % len(EMOJI_DOT)]
-            if roi > 1:
-                # ROI > 100% → très rentable
-                st.success(f"{dot} **Cluster {cluster}** : campagnes très rentables — scaler en priorité. ROI moyen : **{roi*100:.1f}%**")
-            elif roi > 0:
-                # ROI entre 0 et 100% → rentable (PAS "underperforming" — c'était contradictoire)
-                st.info(f"{dot} **Cluster {cluster}** : campagnes rentables — optimiser et développer. ROI moyen : **{roi*100:.1f}%**")
-            elif roi > -0.5:
-                # ROI entre -50% et 0% → sous-performant
-                st.warning(f"{dot} **Cluster {cluster}** : campagnes sous-performantes — optimisation recommandée. ROI moyen : **{roi*100:.1f}%**")
-            else:
-                # ROI < -50% → non rentable
-                st.error(f"{dot} **Cluster {cluster}** : campagnes non rentables — à revoir ou arrêter. ROI moyen : **{roi*100:.1f}%**")
+        if "roi" in summary.columns:
+            st.markdown("### 🧠 Lecture des segments")
+            for _, row in summary.iterrows():
+                msg = (f"Segment {row['cluster']} ({row['n_lignes']} lignes) : ROI médian {row['roi']:+.2f}"
+                       + (f", CTR {row['ctr']:.2%}" if "ctr" in row else "")
+                       + (", CPL " + format_money(row['cpl']) if "cpl" in row else "")
+                       + (", budget médian " + format_money(row['spend']) if "spend" in row else ""))
+                if row["roi"] > 0.5:
+                    st.success(f"🟢 {msg} → très rentable : développer progressivement.")
+                elif row["roi"] > 0:
+                    st.info(f"🔵 {msg} → rentable : maintenir et optimiser.")
+                elif row["roi"] > -0.5:
+                    st.warning(f"🟠 {msg} → peu performant : travailler la conversion ou le ciblage.")
+                else:
+                    st.error(f"🔴 {msg} → détruit de la valeur : couper ou repenser.")
 
-        best_cluster = summary.sort_values(roi_col, ascending=False).iloc[0]
-        worst_cluster = summary.sort_values(roi_col).iloc[0]
-        st.markdown("---")
-        st.markdown("### 🎯 Analyse stratégique")
-        st.write(f"Le cluster le plus performant est le Cluster {int(best_cluster['cluster'])} avec ROI moyen de {best_cluster[roi_col]*100:.1f}%.")
-        st.write(f"Le cluster le moins performant est le Cluster {int(worst_cluster['cluster'])} avec ROI moyen de {worst_cluster[roi_col]*100:.1f}%.")
-        st.write("Recommandation : réallouer le budget vers les clusters les plus performants et optimiser ou arrêter les campagnes non rentables.")
+            best, worst = summary.iloc[0], summary.iloc[-1]
+            st.markdown("### 🎯 Analyse stratégique")
+            st.write(f"Écart de ROI médian entre le meilleur segment ({best['cluster']}, {best['roi']:+.2f}) "
+                     f"et le moins bon ({worst['cluster']}, {worst['roi']:+.2f}). Le ROI n'ayant pas servi à former "
+                     "les segments, cet écart montre que le profil d'une campagne suffit à repérer celles qui "
+                     "détruisent de la valeur.")
+            st.write("Recommandation : réallouer le budget des segments à ROI négatif vers les segments rentables, "
+                     "en surveillant les rendements décroissants (voir la courbe de l'onglet Prediction).")
 
 # ============================================================
 # TAB 5 - AGENT AI

@@ -21,17 +21,31 @@ Acceptance criteria:
 
 ---
 
-## 2. Revenue prediction model
+## 2. Revenue models
 
-The RandomForest regression model is evaluated using:
+Method:
 
-- Train / test split
-- R² (coefficient of determination)
-- RMSE (root mean squared error)
+- **5-fold cross-validation**: metrics are computed on out-of-fold predictions for every row.
+  A single 80/20 split (~50 test rows) is too unstable to be reported.
+- **Grouped cross-validation by campaign**: all rows of a campaign are in the same fold,
+  to measure performance on campaigns the model has never seen.
+- **Metrics**: R², RMSE, MAPE and median absolute percentage error (rows with revenue > 0).
+  The median error is reported first: MAPE is dominated by very small campaigns.
+- **Baseline**: `revenue = orders × average basket`. A model is only kept if it beats it.
+- **Leakage check**: no input may be computed from the target. `roi` is excluded
+  (`roi = (revenue − spend) / spend`).
 
-Additional checks:
-- Compare predicted vs actual revenue for high- and low-spend campaigns
-- Verify that errors are not biased toward a single campaign type
+Two distinct models:
+
+| Model | Inputs | Purpose |
+|---|---|---|
+| Explanatory | impressions, clicks, leads, orders, spend, CTR, CVR, CPL | explain revenue of completed campaigns |
+| Simulation | spend, channel | forecast before launch |
+
+The simulation model reports a range (10th–90th percentile of actual / predicted in cross-validation)
+and flags budgets outside the range observed for the channel.
+
+Results are in the README.
 
 ---
 
@@ -39,10 +53,12 @@ Additional checks:
 
 KMeans clustering is validated by:
 
-- Inspecting cluster centroids
+- Building segments on campaign **profile** only (CTR, CVR, CPL, log budget);
+  revenue and ROI are excluded from the inputs and used to describe segments
+- Choosing k with the silhouette score (k = 2 to 6)
 - Comparing distributions of ROI, CVR and CPL across clusters
 - Verifying that each cluster corresponds to a meaningful business segment
-  (e.g. high ROI, low conversion, high volume, etc.)
+  (e.g. high CTR, poor conversion, high CPL)
 
 ---
 
