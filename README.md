@@ -163,17 +163,17 @@ Method: the model never sees clicks or orders (they are outcomes of the budget, 
 Effect = predicted revenue at the new budget − predicted revenue at the current budget, added to the observed revenue.
 Rows whose new budget exceeds the maximum observed for their channel are reported, since a forest cannot extrapolate.
 
-Output (real `marketing_kpi` data):
+Output (agent on the live Databricks `marketing_kpi` table):
 
 ```
 Simulation +20% budget (social):
   Budget actuel     : CHF 13 798 501
   Budget simulé     : CHF 16 558 201
   Revenue actuel    : CHF 11 911 454
-  Revenue simulé    : CHF 14 809 803
-  Delta revenue     : +CHF 2 898 349 (+24.3%)
-  ROAS incrémental  : 1.05 (each extra franc brings 1.05 of revenue)
-  ROI incrémental   : +5%
+  Revenue simulé    : CHF 14 827 957
+  Delta revenue     : +CHF 2 916 503 (+24.5%)
+  ROAS incrémental  : 1.06 (each extra franc brings 1.06 of revenue)
+  ROI incrémental   : +6%
 ```
 
 ---
@@ -187,8 +187,8 @@ KMeans is run with 10 seeds and the best silhouette is kept (a single seed gives
 | Segment | Profile | Median ROI |
 |---|---|---|
 | Small budgets, high CTR | CTR ≈ 5× the rest | ≈ +1.0 |
-| Large budgets | median budget ≈ 90 k | ≈ +0.15 |
-| Small campaigns, poor conversion | CVR ≈ 4× lower | ≈ −0.25 |
+| Large budgets | highest budgets | ≈ +0.15 to +0.3 |
+| Small campaigns, poor conversion | CVR clearly lower | ≈ −0.15 to −0.25 |
 | Very high CPL | CPL ≈ 2.7× the rest | ≈ −0.9 |
 
 Since ROI played no part in forming the segments, the ROI gap between them is a genuine finding:
@@ -314,7 +314,7 @@ Key steps:
 * Simulate a campaign before launch (budget + channel) with a range
 * Segment campaigns by profile (KMeans, silhouette)
 
-The notebook runs on **Databricks** (including serverless / Free Edition: no `df.cache()`, Spark Connect-safe model handling, ANSI-safe divisions) and on Microsoft Fabric. If `marketing_clean` does not exist, it starts from `marketing_kpi` and does not overwrite it.
+The notebook runs on **Databricks** (including serverless / Free Edition: no `df.cache()`, Spark Connect-safe model handling, ANSI-safe divisions) and on Microsoft Fabric. The source table is `marketing_clean` (or `marketting_clean`, the name used in the Databricks workspace); if neither exists, it starts from `marketing_kpi`. `marketing_kpi` is only overwritten when every one of its current columns is recomputed, so the agent and the Databricks dashboards cannot break.
 
 ---
 
