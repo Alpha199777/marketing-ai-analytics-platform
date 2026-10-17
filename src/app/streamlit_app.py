@@ -623,60 +623,104 @@ au milieu est le ROI médian. En dessous de la ligne pointillée (0), le groupe 
                        + " · ".join(f"k={kk} : {v:.2f}" for kk, v in sil.items())
                        + f". Meilleur k : **{best_k}**.")
 
-        data_c["cluster"] = KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(Xs).astype(str)
+        data_c["cluster"] = KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(Xs)
 
         desc_cols = [c for c in ["roi", "revenue", "spend", "ctr", "cvr", "cpl"] if c in data_c.columns]
         summary = (data_c.groupby("cluster")
                    .agg(n_lignes=("revenue", "size"), **{c: (c, "median") for c in desc_cols})
                    .reset_index())
-        if "roi" in summary.columns:
-            summary = summary.sort_values("roi", ascending=False)
+        has_roi = "roi" in summary.columns
+        summary = summary.sort_values("roi" if has_roi else "revenue", ascending=False).reset_index(drop=True)
+
+        # --- Nom lisible de chaque segment : rang de rentabilité + verdict + trait distinctif ---
+        def verdict(roi):
+            if roi > 0.5:
+                return "très rentable", "🟢", "développer progressivement", st.success
+            if roi > 0:
+                return "rentable", "🔵", "maintenir et optimiser", st.info
+            if roi > -0.5:
+                return "peu performant", "🟠", "travailler la conversion ou le ciblage", st.warning
+            return "perd de l'argent", "🔴", "couper ou repenser", st.error
+
+        TRAITS = {"ctr": ("CTR élevé", "CTR faible"), "cvr": ("forte conversion", "faible conversion"),
+                  "cpl": ("CPL élevé", "CPL faible"), "spend": ("gros budget", "petit budget")}
+        overall = data_c[[c for c in TRAITS if c in data_c.columns]].median()
+
+        def trait(row):
+            """Caractéristique qui distingue le plus le segment de la médiane de toutes les campagnes."""
+            best_name, best_gap = "profil moyen", np.log(1.25)
+            for col, (high, low) in TRAITS.items():
+                if col in row and col in overall and overall[col] > 0:
+                    gap = np.log((row[col] + 1e-9) / overall[col])
+                    if abs(gap) > best_gap:
+                        best_name, best_gap = (high if gap > 0 else low), abs(gap)
+            return best_name
+
+        summary["rang"] = np.arange(1, len(summary) + 1)
+        summary["segment"] = [
+            f"S{r} · {verdict(row['roi'])[0]} · {trait(row)}" if has_roi else f"S{r} · {trait(row)}"
+            for r, (_, row) in zip(summary["rang"], summary.iterrows())
+        ]
+        label_of = dict(zip(summary["cluster"], summary["segment"]))
+        data_c["segment"] = data_c["cluster"].map(label_of)
+        order = list(summary["segment"])
+        # Du vert (le plus rentable) au rouge (le moins rentable), mêmes couleurs partout
+        # (palette contrastée : pas de jaune pâle, invisible sur fond blanc)
+        scale = [[0.0, "#1b7837"], [0.35, "#7fbc41"], [0.55, "#e6a700"], [0.75, "#f46d43"], [1.0, "#b2182b"]]
+        ramp = px.colors.sample_colorscale(scale, [i / max(len(order) - 1, 1) for i in range(len(order))])
+        colors = dict(zip(order, ramp))
 
         with c2:
-            st.markdown("**Profil médian de chaque segment**")
-            st.dataframe(summary.style.format({"roi": "{:+.2f}", "revenue": "{:,.0f}", "spend": "{:,.0f}",
-                                               "ctr": "{:.2%}", "cvr": "{:.2%}", "cpl": "{:,.0f}"}),
+            st.markdown("**Profil médian de chaque segment** (classés du plus rentable au moins rentable)")
+            table = summary[["segment", "n_lignes"] + desc_cols].rename(columns={
+                "segment": "Segment", "n_lignes": "Nb lignes", "roi": "ROI médian", "revenue": "Revenu médian",
+                "spend": "Budget médian", "ctr": "CTR", "cvr": "CVR", "cpl": "CPL"})
+            fmt = {"ROI médian": "{:+.2f}", "Revenu médian": "{:,.0f}", "Budget médian": "{:,.0f}",
+                   "CTR": "{:.2%}", "CVR": "{:.2%}", "CPL": "{:,.0f}"}
+            st.dataframe(table.style.format({c: f for c, f in fmt.items() if c in table.columns}),
                          use_container_width=True, hide_index=True)
 
+        st.caption("🎨 **Lecture des couleurs** : S1 est le segment le plus rentable (vert), le dernier le moins "
+                   "rentable (rouge). Les couleurs et les noms sont les mêmes dans le tableau, les deux graphiques "
+                   "et la lecture ci-dessous.")
         g1, g2 = st.columns(2)
         with g1:
             x_ax, y_ax = profile_feats[0], ("cpl" if "cpl" in profile_feats else profile_feats[1])
-            fig = px.scatter(data_c, x=x_ax, y=y_ax, color="cluster", hover_name="campaign",
-                             category_orders={"cluster": sorted(data_c["cluster"].unique())},
+            fig = px.scatter(data_c, x=x_ax, y=y_ax, color="segment", hover_name="campaign",
+                             category_orders={"segment": order}, color_discrete_map=colors,
+                             labels={"ctr": "CTR", "cpl": "CPL (CHF)", "cvr": "CVR", "segment": "Segment"},
                              title=f"Profil des segments : {x_ax.upper()} vs {y_ax.upper()}")
-            fig.update_layout(height=450, margin=dict(l=10, r=10, t=40, b=10))
+            fig.update_layout(height=470, margin=dict(l=10, r=10, t=40, b=10),
+                              legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="left", x=0))
             st.plotly_chart(fig, use_container_width=True)
         with g2:
-            if "roi" in data_c.columns:
-                fig_roi = px.box(data_c, x="cluster", y="roi", color="cluster", points="outliers",
-                                 category_orders={"cluster": sorted(data_c["cluster"].unique())},
-                                 title="ROI par segment (non utilisé pour le clustering)")
+            if has_roi:
+                data_c["rang"] = data_c["segment"].map({s: f"S{i + 1}" for i, s in enumerate(order)})
+                fig_roi = px.box(data_c, x="rang", y="roi", color="segment", points="outliers",
+                                 category_orders={"segment": order, "rang": [f"S{i + 1}" for i in range(len(order))]},
+                                 color_discrete_map=colors,
+                                 labels={"rang": "Segment", "roi": "ROI (sous la ligne 0 = perte)"},
+                                 title="ROI par segment (non utilisé pour former les segments)")
                 fig_roi.add_hline(y=0, line_dash="dash", line_color="grey")
-                fig_roi.update_layout(height=450, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
+                fig_roi.update_layout(height=470, showlegend=False, margin=dict(l=10, r=10, t=40, b=10))
                 st.plotly_chart(fig_roi, use_container_width=True)
 
-        if "roi" in summary.columns:
+        if has_roi:
             st.markdown("### 🧠 Lecture des segments")
             for _, row in summary.iterrows():
-                msg = (f"Segment {row['cluster']} ({row['n_lignes']} lignes) : ROI médian {row['roi']:+.2f}"
-                       + (f", CTR {row['ctr']:.2%}" if "ctr" in row else "")
-                       + (", CPL " + format_money(row['cpl']) if "cpl" in row else "")
-                       + (", budget médian " + format_money(row['spend']) if "spend" in row else ""))
-                if row["roi"] > 0.5:
-                    st.success(f"🟢 {msg} → très rentable : développer progressivement.")
-                elif row["roi"] > 0:
-                    st.info(f"🔵 {msg} → rentable : maintenir et optimiser.")
-                elif row["roi"] > -0.5:
-                    st.warning(f"🟠 {msg} → peu performant : travailler la conversion ou le ciblage.")
-                else:
-                    st.error(f"🔴 {msg} → détruit de la valeur : couper ou repenser.")
+                name, emoji, action, box = verdict(row["roi"])
+                details = (f"ROI médian {row['roi']:+.2f}"
+                           + (f" · CTR {row['ctr']:.2%}" if "ctr" in row else "")
+                           + (" · CPL " + format_money(row["cpl"]) if "cpl" in row else "")
+                           + (" · budget médian " + format_money(row["spend"]) if "spend" in row else ""))
+                box(f"{emoji} **{row['segment']}** ({row['n_lignes']} lignes) — {details}  \n→ **{action}**.")
 
             best, worst = summary.iloc[0], summary.iloc[-1]
             st.markdown("### 🎯 Analyse stratégique")
-            st.write(f"Écart de ROI médian entre le meilleur segment ({best['cluster']}, {best['roi']:+.2f}) "
-                     f"et le moins bon ({worst['cluster']}, {worst['roi']:+.2f}). Le ROI n'ayant pas servi à former "
-                     "les segments, cet écart montre que le profil d'une campagne suffit à repérer celles qui "
-                     "détruisent de la valeur.")
+            st.write(f"Le segment le plus rentable (**{best['segment']}**, ROI médian {best['roi']:+.2f}) et le moins "
+                     f"rentable (**{worst['segment']}**, ROI médian {worst['roi']:+.2f}) ont des profils différents. "
+                     "Le ROI n'ayant pas servi à former les segments, cet écart montre que le profil d'une campagne "
+                     "(CTR, conversion, CPL, budget) suffit à repérer celles qui perdent de l'argent.")
             st.write("Recommandation : réallouer le budget des segments à ROI négatif vers les segments rentables, "
                      "en surveillant les rendements décroissants (voir la courbe de l'onglet Prediction).")
 
