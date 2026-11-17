@@ -1,4 +1,5 @@
 import os
+import uuid
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -735,7 +736,9 @@ with tab5:
 1. **Comprendre** : un modèle de langage (GPT-4o-mini) identifie le type de question  
    (classement, diagnostic, segmentation, simulation de budget).  
 2. **Choisir un outil** : il choisit parmi 4 outils prédéfinis (classer les campagnes, trouver les campagnes  
-   sous-performantes, agréger par canal, simuler une variation de budget).  
+   sous-performantes, agréger par canal, simuler une variation de budget).
+   ⏸️ **Pause de validation** : l'agent s'arrête ici et affiche son plan ; tu peux le corriger puis valider
+   avant toute requête sur Databricks.
 3. **Interroger les données** : l'outil exécute une requête SQL **prédéfinie, qui ne fait que lire** la table  
    `marketing_kpi` de Databricks. Le modèle de langage n'écrit jamais de SQL lui-même : il ne peut ni modifier  
    ni supprimer de données.  
@@ -761,6 +764,7 @@ with tab5:
         from langchain_core.tools import tool as _tool
         from pydantic import BaseModel as _BM, Field as _F
         from langgraph.graph import StateGraph as _SG, END as _END
+        from langgraph.checkpoint.memory import MemorySaver as _MemorySaver
         from typing import Literal as _Lit, Optional as _Opt
 
         def _run_sql(query, params=(), max_rows=100):
@@ -942,6 +946,11 @@ with tab5:
             state.final_answer = msg.content
             return state
 
+        # Le checkpointer sauvegarde l'état du graphe. Streamlit ré-exécute tout le script à chaque clic :
+        # on le garde dans session_state pour qu'il survive entre « Analyser » et « Valider ».
+        if "agent_checkpointer" not in st.session_state:
+            st.session_state["agent_checkpointer"] = _MemorySaver()
+
         def _build_graph():
             g = _SG(_State)
             g.add_node("route", _route)
@@ -953,7 +962,9 @@ with tab5:
             g.add_edge("plan", "execute")
             g.add_edge("execute", "compose")
             g.add_edge("compose", _END)
-            return g.compile()
+            # SUPERVISION : le graphe se met en pause juste avant "execute" (avant tout appel à Databricks)
+            return g.compile(checkpointer=st.session_state["agent_checkpointer"],
+                             interrupt_before=["execute"])
 
         AGENT_GRAPH = _build_graph()
 
@@ -973,22 +984,83 @@ with tab5:
             placeholder="Ex: Quelles campagnes ont le meilleur ROI ?",
         )
 
+        def _agent_error(e):
+            if "invalid access token" in str(e).lower():
+                st.error("Databricks refuse la connexion : le jeton d'accès (DATABRICKS_ACCESS_TOKEN) est "
+                         "invalide ou expiré. Génère un nouveau Personal Access Token dans Databricks "
+                         "(Settings → Developer → Access tokens) et remplace-le dans les secrets Streamlit.")
+            else:
+                st.error(f"Erreur agent : {e}")
+
+        def _plan_of(snapshot):
+            vals = snapshot.values
+            return vals["tool_calls"] if isinstance(vals, dict) else vals.tool_calls
+
+        # ---------- Étape 1 : l'agent comprend la question et prépare son plan, puis S'ARRÊTE ----------
         if st.button("🚀 Analyser", type="primary") and question.strip():
-            with st.spinner("🤖 L'agent analyse tes données Databricks..."):
+            st.session_state["thread_id"] = str(uuid.uuid4())      # nouvelle conversation = nouveau thread
+            st.session_state.pop("agent_result", None)
+            cfg = {"configurable": {"thread_id": st.session_state["thread_id"]}}
+            with st.spinner("🤖 L'agent prépare son plan..."):
                 try:
-                    state = _State(user_question=question)
-                    result = AGENT_GRAPH.invoke(state)
-                    st.markdown("### 📊 Réponse de l'agent")
-                    st.markdown(result["final_answer"])
-                    with st.expander("🔍 Détails techniques (tool calls)"):
-                        st.json(result["tool_calls"])
+                    AGENT_GRAPH.invoke(_State(user_question=question), cfg)   # s'arrête avant "execute"
+                    st.session_state["agent_pending"] = True
                 except Exception as e:
-                    if "invalid access token" in str(e).lower():
-                        st.error("Databricks refuse la connexion : le jeton d'accès (DATABRICKS_ACCESS_TOKEN) est "
-                                 "invalide ou expiré. Génère un nouveau Personal Access Token dans Databricks "
-                                 "(Settings → Developer → Access tokens) et remplace-le dans les secrets Streamlit.")
-                    else:
-                        st.error(f"Erreur agent : {e}")
+                    st.session_state["agent_pending"] = False
+                    _agent_error(e)
+
+        # ---------- Étape 2 : l'humain relit (et corrige si besoin) le plan, puis valide ----------
+        if st.session_state.get("agent_pending"):
+            cfg = {"configurable": {"thread_id": st.session_state["thread_id"]}}
+            plan = _plan_of(AGENT_GRAPH.get_state(cfg))
+            st.markdown("### ⏸️ Plan de l'agent : à valider avant d'interroger Databricks")
+            st.caption("L'agent a choisi ces outils. Tu peux modifier le JSON (2 appels maximum), "
+                       "puis cliquer sur Valider. Rien n'a encore été exécuté.")
+            plan_text = st.text_area("Outils à exécuter", value=_json.dumps(plan, ensure_ascii=False, indent=2),
+                                     height=180, key="plan_edit_" + st.session_state["thread_id"])
+            b_ok, b_no = st.columns(2)
+            with b_ok:
+                validate = st.button("✅ Valider et exécuter", type="primary")
+            with b_no:
+                cancel = st.button("❌ Annuler")
+
+            if cancel:
+                st.session_state["agent_pending"] = False
+                st.rerun()
+
+            if validate:
+                try:
+                    new_plan = _json.loads(plan_text)
+                except ValueError:
+                    new_plan = None
+                valid = (isinstance(new_plan, list) and len(new_plan) <= 2
+                         and all(isinstance(c, dict) and c.get("tool") in _TOOL_MAP for c in new_plan))
+                if not valid:
+                    st.error("Plan invalide : il faut une liste JSON de 2 appels maximum, avec des outils parmi : "
+                             + ", ".join(_TOOL_MAP) + ".")
+                else:
+                    done = False
+                    with st.spinner("🤖 L'agent interroge Databricks et rédige la réponse..."):
+                        try:
+                            if new_plan != plan:    # l'humain a corrigé le plan : on l'écrit dans l'état (as_node="plan")
+                                AGENT_GRAPH.update_state(cfg, {"tool_calls": new_plan}, as_node="plan")
+                            result = AGENT_GRAPH.invoke(None, cfg)    # reprend à "execute"
+                            st.session_state["agent_result"] = {"answer": result["final_answer"],
+                                                                "tool_calls": result["tool_calls"]}
+                            st.session_state["agent_pending"] = False
+                            done = True
+                        except Exception as e:
+                            _agent_error(e)
+                    if done:
+                        st.rerun()
+
+        # ---------- Réponse finale ----------
+        agent_res = st.session_state.get("agent_result")
+        if agent_res:
+            st.markdown("### 📊 Réponse de l'agent")
+            st.markdown(agent_res["answer"])
+            with st.expander("🔍 Détails techniques (tool calls)"):
+                st.json(agent_res["tool_calls"])
 
 # ============================================================
 # TAB 6 - FINE-TUNED AI
