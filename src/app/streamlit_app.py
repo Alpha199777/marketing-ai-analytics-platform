@@ -985,12 +985,23 @@ with tab5:
         )
 
         def _agent_error(e):
-            if "invalid access token" in str(e).lower():
-                st.error("Databricks refuse la connexion : le jeton d'accès (DATABRICKS_ACCESS_TOKEN) est "
-                         "invalide ou expiré. Génère un nouveau Personal Access Token dans Databricks "
-                         "(Settings → Developer → Access tokens) et remplace-le dans les secrets Streamlit.")
+            """Message court pour les visiteurs. Les détails techniques n'apparaissent que si APP_DEBUG=1."""
+            msg = str(e).lower()
+            if "cannot create the resource" in msg:
+                st.warning("⏳ Le service de données est en cours de démarrage. Réessaie dans une minute.")
+                hint = ("SQL Warehouse arrêté : Databricks → SQL Warehouses → Start, attends « Running », "
+                        "puis reclique sur « Valider et exécuter » (le plan est conservé).")
+            elif "invalid access token" in msg:
+                st.error("Le service de données est momentanément indisponible. Réessaie plus tard.")
+                hint = ("Jeton Databricks invalide ou expiré : génère un nouveau Personal Access Token "
+                        "(Settings → Developer → Access tokens) et remplace-le dans les secrets Streamlit.")
             else:
-                st.error(f"Erreur agent : {e}")
+                st.error("Une erreur est survenue. Réessaie dans un instant.")
+                hint = None
+            if os.environ.get("APP_DEBUG") == "1":      # visible uniquement pour toi
+                if hint:
+                    st.info("🛠️ Debug : " + hint)
+                st.code(str(e))
 
         def _plan_of(snapshot):
             vals = snapshot.values
